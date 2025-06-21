@@ -228,7 +228,7 @@ export const validatePerformanceTargets = (targets) => {
     if (isNaN(weeklyEarn) || weeklyEarn < 0) {
       errors.push('L\'objectif de gains hebdomadaires doit être un nombre positif');
     } else if (weeklyEarn > 100000) {
-      errors.push('L\'objectif de gains hebdomadaires semble irréaliste (maximum 100 000€)');
+      errors.push('L\'objectif de gains hebdomadaires semble irréaliste (maximum 100 000$)');
     }
   }
   
@@ -238,7 +238,7 @@ export const validatePerformanceTargets = (targets) => {
     if (isNaN(monthlyEarn) || monthlyEarn < 0) {
       errors.push('L\'objectif de gains mensuels doit être un nombre positif');
     } else if (monthlyEarn > 500000) {
-      errors.push('L\'objectif de gains mensuels semble irréaliste (maximum 500 000€)');
+      errors.push('L\'objectif de gains mensuels semble irréaliste (maximum 500 000$)');
     }
     
     // Vérifier la cohérence avec l'objectif hebdomadaire

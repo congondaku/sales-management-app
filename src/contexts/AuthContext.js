@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { authService } from '../services/auth.service';
+import { salesPersonAuthService } from '../services/sales-person-auth.service';
 
+// Create the context
 const AuthContext = createContext();
 
 export const useAuth = () => {
@@ -16,6 +18,7 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [userType, setUserType] = useState(null); // 'admin' | 'sales_person'
 
   // Initialiser l'authentification au chargement
   useEffect(() => {
@@ -24,12 +27,23 @@ export const AuthProvider = ({ children }) => {
 
   const initializeAuth = () => {
     try {
-      const storedToken = authService.getToken();
-      const storedUser = authService.getCurrentUser();
+      // Check for admin token first
+      const adminToken = authService.getToken();
+      const adminUser = authService.getCurrentUser();
 
-      if (storedToken && storedUser) {
-        setToken(storedToken);
-        setUser(storedUser);
+      // Check for sales person token
+      const salesToken = salesPersonAuthService.getToken();
+      const salesPerson = salesPersonAuthService.getCurrentSalesPerson();
+
+      if (adminToken && adminUser) {
+        setToken(adminToken);
+        setUser(adminUser);
+        setUserType('admin');
+        setIsAuthenticated(true);
+      } else if (salesToken && salesPerson) {
+        setToken(salesToken);
+        setUser(salesPerson);
+        setUserType('sales_person');
         setIsAuthenticated(true);
       }
     } catch (error) {
@@ -40,27 +54,59 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // ✅ ENHANCED: Universal login that detects user type
   const login = async (email, password) => {
     try {
       setLoading(true);
-      const response = await authService.login(email, password);
       
-      if (response.success) {
-        const { token: authToken, admin } = response;
-        
-        // Stocker dans localStorage
-        localStorage.setItem('admin_token', authToken);
-        localStorage.setItem('admin_user', JSON.stringify(admin));
-        
-        // Mettre à jour l'état
-        setToken(authToken);
-        setUser(admin);
-        setIsAuthenticated(true);
-        
-        return { success: true };
-      } else {
-        throw new Error(response.message || 'Connexion échouée');
+      // Try admin login first
+      try {
+        const adminResponse = await authService.login(email, password);
+        if (adminResponse.success) {
+          const { token: authToken, admin } = adminResponse;
+          
+          // Store admin data
+          localStorage.setItem('admin_token', authToken);
+          localStorage.setItem('admin_user', JSON.stringify(admin));
+          
+          // Update state
+          setToken(authToken);
+          setUser(admin);
+          setUserType('admin');
+          setIsAuthenticated(true);
+          
+          return { success: true, userType: 'admin' };
+        }
+      } catch (adminError) {
+        // Admin login failed, try sales person login
+        console.log('Admin login failed, trying sales person login...');
       }
+
+      // Try sales person login
+      try {
+        const salesResponse = await salesPersonAuthService.login(email, password);
+        if (salesResponse.success) {
+          const { token: authToken, salesPerson } = salesResponse;
+          
+          // Store sales person data
+          localStorage.setItem('sales_token', authToken);
+          localStorage.setItem('sales_person', JSON.stringify(salesPerson));
+          
+          // Update state
+          setToken(authToken);
+          setUser(salesPerson);
+          setUserType('sales_person');
+          setIsAuthenticated(true);
+          
+          return { success: true, userType: 'sales_person' };
+        }
+      } catch (salesError) {
+        console.log('Sales person login also failed');
+      }
+
+      // Both failed
+      throw new Error('Email ou mot de passe incorrect');
+      
     } catch (error) {
       console.error('Erreur de connexion:', error);
       return { 
@@ -87,6 +133,7 @@ export const AuthProvider = ({ children }) => {
         // Mettre à jour l'état
         setToken(authToken);
         setUser(admin);
+        setUserType('admin');
         setIsAuthenticated(true);
         
         return { success: true };
@@ -104,25 +151,59 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // ✅ ENHANCED: Clear all auth data
   const logout = () => {
+    // Clear admin data
     authService.logout();
+    // Clear sales person data
+    salesPersonAuthService.logout();
+    
     setUser(null);
     setToken(null);
+    setUserType(null);
     setIsAuthenticated(false);
   };
 
   const updateUser = (updatedUser) => {
     setUser(updatedUser);
-    localStorage.setItem('admin_user', JSON.stringify(updatedUser));
+    
+    // Update appropriate localStorage
+    if (userType === 'admin') {
+      localStorage.setItem('admin_user', JSON.stringify(updatedUser));
+    } else if (userType === 'sales_person') {
+      localStorage.setItem('sales_person', JSON.stringify(updatedUser));
+    }
   };
 
+  // ✅ ENHANCED: Permission checking based on user type
   const hasPermission = (permission) => {
-    if (!user || !user.permissions) return false;
-    return user.permissions[permission] === true;
+    if (!user) return false;
+    
+    if (userType === 'admin') {
+      if (!user.permissions) return false;
+      // CEO has all permissions
+      if (user.role === 'ceo') return true;
+      return user.permissions[permission] === true;
+    }
+    
+    if (userType === 'sales_person') {
+      // Sales people have basic permissions
+      const salesPermissions = {
+        canRegisterUsers: true,
+        canViewOwnData: true,
+        canEditProfile: true
+      };
+      return salesPermissions[permission] === true;
+    }
+    
+    return false;
   };
 
   const canManage = (entityType, entityId = null) => {
     if (!user) return false;
+    
+    // Only admins can manage entities
+    if (userType !== 'admin') return false;
     
     // CEO peut tout gérer
     if (user.role === 'ceo') return true;
@@ -137,12 +218,28 @@ export const AuthProvider = ({ children }) => {
     return user.managementScope[entityType]?.length > 0;
   };
 
+  // ✅ NEW: Check if current user is admin
+  const isAdmin = () => userType === 'admin';
+  
+  // ✅ NEW: Check if current user is sales person
+  const isSalesPerson = () => userType === 'sales_person';
+  
+  // ✅ NEW: Get user role (works for both types)
+  const getUserRole = () => {
+    if (userType === 'admin') return user?.role;
+    if (userType === 'sales_person') return 'sales_person';
+    return null;
+  };
+
   const refreshToken = async () => {
     try {
-      // Si vous avez un endpoint de refresh token
-      // const response = await authService.refreshToken();
-      // Mettre à jour le token
-      console.log('Token refresh non implémenté');
+      if (userType === 'admin') {
+        // Admin token refresh logic
+        console.log('Admin token refresh non implémenté');
+      } else if (userType === 'sales_person') {
+        // Sales person token refresh logic
+        console.log('Sales person token refresh non implémenté');
+      }
     } catch (error) {
       console.error('Erreur lors du refresh du token:', error);
       logout();
@@ -163,6 +260,7 @@ export const AuthProvider = ({ children }) => {
     token,
     loading,
     isAuthenticated,
+    userType, // ✅ NEW
     
     // Actions
     login,
@@ -173,7 +271,10 @@ export const AuthProvider = ({ children }) => {
     
     // Utilitaires
     hasPermission,
-    canManage
+    canManage,
+    isAdmin, // ✅ NEW
+    isSalesPerson, // ✅ NEW
+    getUserRole // ✅ NEW
   };
 
   return (
@@ -182,3 +283,6 @@ export const AuthProvider = ({ children }) => {
     </AuthContext.Provider>
   );
 };
+
+// Export the context for direct use if needed
+export { AuthContext };

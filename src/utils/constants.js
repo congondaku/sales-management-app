@@ -8,7 +8,7 @@ export const APP_CONFIG = {
 
 // Configuration de l'API
 export const API_CONFIG = {
-  BASE_URL: process.env.REACT_APP_API_URL || 'http://localhost:5000/api',
+  BASE_URL: process.env.REACT_APP_API_URL || 'http://localhost:5002/api',
   TIMEOUT: parseInt(process.env.REACT_APP_API_TIMEOUT) || 10000,
   RETRY_ATTEMPTS: 3,
   RETRY_DELAY: 1000
@@ -157,7 +157,7 @@ export const NOTIFICATION_TYPES = {
 
 // Configuration des notifications
 export const NOTIFICATION_CONFIG = {
-  DEFAULT_DURATION: parseInt(process.env.REACT_APP_TOAST_DURATION) || 5000,
+  DEFAULT_DURATION: parseInt(process.env.REACT_APP_TOAST_DURATION) || 5002,
   POSITION: 'top-right',
   MAX_NOTIFICATIONS: 5,
   ENABLE_SOUND: false
@@ -196,7 +196,7 @@ export const CURRENCIES = {
 
 // Symboles des devises
 export const CURRENCY_SYMBOLS = {
-  [CURRENCIES.EUR]: '€',
+  // [CURRENCIES.EUR]: '€',
   [CURRENCIES.USD]: '$',
   [CURRENCIES.GBP]: '£',
   [CURRENCIES.CAD]: 'C$'

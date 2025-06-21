@@ -1,36 +1,56 @@
 import { useState, useMemo } from 'react';
 
-export const usePagination = (items, itemsPerPage = 10) => {
+const usePagination = (items, itemsPerPage = 10) => {
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Ensure items is always an array
+  const safeItems = Array.isArray(items) ? items : [];
 
   const paginatedData = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
-    return items.slice(startIndex, endIndex);
-  }, [items, currentPage, itemsPerPage]);
+    return safeItems.slice(startIndex, endIndex);
+  }, [safeItems, currentPage, itemsPerPage]);
 
-  const totalPages = Math.ceil(items.length / itemsPerPage);
+  const totalPages = Math.ceil(safeItems.length / itemsPerPage);
 
   const goToPage = (page) => {
-    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
   };
 
-  const nextPage = () => {
-    goToPage(currentPage + 1);
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
   };
 
-  const prevPage = () => {
-    goToPage(currentPage - 1);
+  const goToPreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const resetPagination = () => {
+    setCurrentPage(1);
   };
 
   return {
     currentPage,
     totalPages,
     paginatedData,
+    totalItems: safeItems.length,
+    itemsPerPage,
     goToPage,
-    nextPage,
-    prevPage,
+    goToNextPage,
+    goToPreviousPage,
+    resetPagination,
     hasNextPage: currentPage < totalPages,
-    hasPrevPage: currentPage > 1
+    hasPreviousPage: currentPage > 1,
+    startIndex: (currentPage - 1) * itemsPerPage,
+    endIndex: Math.min(currentPage * itemsPerPage, safeItems.length)
   };
 };
+
+export default usePagination;
