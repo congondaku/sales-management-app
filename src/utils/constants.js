@@ -8,7 +8,7 @@ export const APP_CONFIG = {
 
 // Configuration de l'API
 export const API_CONFIG = {
-  BASE_URL: process.env.REACT_APP_API_URL || 'http://localhost:5002/api',
+  BASE_URL: process.env.REACT_APP_API_URL || 'https://4fm32xbz2d.us-east-1.awsapprunner.com/api',
   TIMEOUT: parseInt(process.env.REACT_APP_API_TIMEOUT) || 10000,
   RETRY_ATTEMPTS: 3,
   RETRY_DELAY: 1000

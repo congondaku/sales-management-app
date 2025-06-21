@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5002/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://4fm32xbz2d.us-east-1.awsapprunner.com/api';
 const API_TIMEOUT = parseInt(process.env.REACT_APP_API_TIMEOUT) || 10000;
 
 // Instance Axios configurée
