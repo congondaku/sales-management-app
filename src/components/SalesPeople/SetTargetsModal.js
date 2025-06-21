@@ -326,7 +326,7 @@ const SetTargetsModal = ({ salesPerson, onClose, onSuccess }) => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Revenus trimestriels (€)
+                      Revenus trimestriels ($)
                     </label>
                     <div className="relative">
                       <BarChart3 className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />

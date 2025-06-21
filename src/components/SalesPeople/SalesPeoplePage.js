@@ -437,7 +437,7 @@ const SalesPeoplePage = () => {
               </div>
               <div className="ml-4">
                 <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                  €{performanceStats.totalCommissions?.toLocaleString() || '0'}
+                  ${performanceStats.totalCommissions?.toLocaleString() || '0'}
                 </div>
                 <div className="text-sm text-gray-600 dark:text-gray-400">
                   Commissions ce mois
