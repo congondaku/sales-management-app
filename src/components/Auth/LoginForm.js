@@ -13,7 +13,7 @@ const LoginForm = () => {
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [serverError, setServerError] = useState('');
-  const [loginSuccess, setLoginSuccess] = useState(null); // ✅ NEW: Show login success
+  const [loginSuccess, setLoginSuccess] = useState(null);
 
   const { login } = useAuth();
 
@@ -110,13 +110,17 @@ const LoginForm = () => {
                 type="email"
                 value={formData.email}
                 onChange={(e) => handleInputChange('email', e.target.value)}
-                className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors bg-white text-gray-900 placeholder-gray-500 ${
                   errors.email ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
                 }`}
                 placeholder="votre@email.com"
                 disabled={isLoading}
                 autoComplete="email"
                 autoFocus
+                style={{ 
+                  color: '#111827', // Ensure dark text
+                  backgroundColor: '#ffffff' // Ensure white background
+                }}
               />
             </div>
             {errors.email && (
@@ -135,12 +139,16 @@ const LoginForm = () => {
                 type={showPassword ? 'text' : 'password'}
                 value={formData.password}
                 onChange={(e) => handleInputChange('password', e.target.value)}
-                className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors bg-white text-gray-900 placeholder-gray-500 ${
                   errors.password ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
                 }`}
                 placeholder="••••••••"
                 disabled={isLoading}
                 autoComplete="current-password"
+                style={{ 
+                  color: '#111827', // Ensure dark text
+                  backgroundColor: '#ffffff' // Ensure white background
+                }}
               />
               <button
                 type="button"
@@ -189,7 +197,7 @@ const LoginForm = () => {
         </form>
 
         {/* ✅ NEW: Info box */}
-        <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+        <div className="mt-4 p-4 bg-blue-50 rounded-lg">
           <p className="text-xs text-blue-800 text-center font-medium">
             💡 Utilisez vos identifiants admin ou commercial
           </p>
@@ -202,7 +210,7 @@ const LoginForm = () => {
         {process.env.NODE_ENV === 'development' && (
           <div className="mt-4 p-3 bg-gray-50 rounded-lg">
             <p className="text-xs text-gray-600 text-center">
-              Mode développement - Backend sur le port 5002
+              Mode développement - Backend connecté
             </p>
           </div>
         )}
