@@ -1,7 +1,11 @@
+// apiClient.js - Fixed version
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://4fm32xbz2d.us-east-1.awsapprunner.com/api';
-const API_TIMEOUT = parseInt(process.env.REACT_APP_API_TIMEOUT) || 10000;
+// ✅ FORCE the deployed URL - don't rely on env variables that might not be set
+const API_BASE_URL = 'https://evn92jcmry.us-east-1.awsapprunner.com/api';
+const API_TIMEOUT = 10000;
+
+console.log('🔧 API Base URL:', API_BASE_URL); // Debug log
 
 // Instance Axios configurée
 const apiClient = axios.create({
@@ -12,32 +16,45 @@ const apiClient = axios.create({
   },
 });
 
-// ✅ ENHANCED: Support for both admin and sales person tokens
+// ✅ Add request interceptor to log requests for debugging
 apiClient.interceptors.request.use(
   (config) => {
+    console.log('🚀 API Request:', config.method?.toUpperCase(), config.baseURL + config.url);
+    
     // Check for admin token first
     const adminToken = localStorage.getItem('admin_token');
     const salesToken = localStorage.getItem('sales_token');
     
     if (adminToken) {
       config.headers.Authorization = `Bearer ${adminToken}`;
+      console.log('🔑 Using admin token');
     } else if (salesToken) {
       config.headers.Authorization = `Bearer ${salesToken}`;
+      console.log('🔑 Using sales token');
     }
     
     return config;
   },
   (error) => {
+    console.error('❌ Request interceptor error:', error);
     return Promise.reject(error);
   }
 );
 
-// ✅ ENHANCED: Better error handling for different user types
+// ✅ Enhanced response interceptor with better logging
 apiClient.interceptors.response.use(
   (response) => {
+    console.log('✅ API Response:', response.status, response.config.url);
     return response;
   },
   (error) => {
+    console.error('❌ API Error:', {
+      status: error.response?.status,
+      url: error.config?.url,
+      message: error.response?.data?.message || error.message,
+      fullUrl: error.config ? error.config.baseURL + error.config.url : 'Unknown URL'
+    });
+    
     if (error.response?.status === 401) {
       // Determine which type of token expired
       const adminToken = localStorage.getItem('admin_token');
@@ -62,15 +79,6 @@ apiClient.interceptors.response.use(
           window.location.href = '/sales-login';
         }
       }
-    }
-    
-    // ✅ ENHANCED: Better error messages
-    if (error.response?.status === 403) {
-      console.warn('Access denied:', error.response.data.message);
-    }
-    
-    if (error.response?.status >= 500) {
-      console.error('Server error:', error.response.data);
     }
     
     return Promise.reject(error);
@@ -101,6 +109,19 @@ export const apiHelpers = {
     localStorage.removeItem('admin_user');
     localStorage.removeItem('sales_token');
     localStorage.removeItem('sales_person');
+  },
+  
+  // ✅ Test API connectivity
+  async testConnection() {
+    try {
+      console.log('🧪 Testing API connection to:', API_BASE_URL);
+      const response = await apiClient.get('/health'); // or any basic endpoint
+      console.log('✅ API Connection successful:', response.status);
+      return true;
+    } catch (error) {
+      console.error('❌ API Connection failed:', error.message);
+      return false;
+    }
   }
 };
 

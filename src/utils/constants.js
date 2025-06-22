@@ -1,4 +1,4 @@
-// Configuration de l'application
+// config.js - Fixed version with hardcoded deployed URL
 export const APP_CONFIG = {
   NAME: 'Système de Gestion des Ventes',
   VERSION: '1.0.0',
@@ -6,13 +6,29 @@ export const APP_CONFIG = {
   COMPANY: 'Votre Entreprise'
 };
 
-// Configuration de l'API
+// ✅ FIXED: Force the deployed URL instead of relying on environment variables
 export const API_CONFIG = {
-  BASE_URL: process.env.REACT_APP_API_URL || 'https://4fm32xbz2d.us-east-1.awsapprunner.com/api',
-  TIMEOUT: parseInt(process.env.REACT_APP_API_TIMEOUT) || 10000,
+  BASE_URL: 'https://evn92jcmry.us-east-1.awsapprunner.com/api', // Hardcoded deployed URL
+  FALLBACK_URL: 'http://localhost:5002/api', // Keep as fallback for development
+  TIMEOUT: 10000,
   RETRY_ATTEMPTS: 3,
   RETRY_DELAY: 1000
 };
+
+// ✅ Helper to determine which API URL to use
+export const getApiUrl = () => {
+  // In production, always use the deployed URL
+  if (process.env.NODE_ENV === 'production') {
+    return API_CONFIG.BASE_URL;
+  }
+  
+  // In development, prefer environment variable, fallback to localhost
+  return process.env.REACT_APP_API_URL || API_CONFIG.FALLBACK_URL;
+};
+
+// Log the API URL being used (for debugging)
+console.log('🔧 Environment:', process.env.NODE_ENV);
+console.log('🔧 API URL being used:', getApiUrl());
 
 // Configuration de l'authentification
 export const AUTH_CONFIG = {
