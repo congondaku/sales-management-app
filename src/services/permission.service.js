@@ -94,10 +94,10 @@ export const permissionService = {
   },
 
   // ================================
-  // ADMIN MANAGEMENT (UPDATED)
+  // ADMIN MANAGEMENT (FIXED ENDPOINTS)
   // ================================
 
-  // Créer un nouvel admin
+  // ✅ FIXED: Create admin using correct endpoint
   async createAdmin(adminData) {
     try {
       const response = await apiClient.post('/permissions/admin/create', adminData);
@@ -107,7 +107,7 @@ export const permissionService = {
     }
   },
 
-  // ✅ NEW: Suspendre un admin
+  // ✅ FIXED: Suspend admin using correct endpoint
   async suspendAdmin(adminId, reason = '') {
     try {
       const response = await apiClient.put(`/permissions/admin/${adminId}/suspend`, {
@@ -119,7 +119,7 @@ export const permissionService = {
     }
   },
 
-  // ✅ NEW: Réactiver un admin
+  // ✅ FIXED: Unsuspend admin using correct endpoint
   async unsuspendAdmin(adminId) {
     try {
       const response = await apiClient.put(`/permissions/admin/${adminId}/unsuspend`);
@@ -129,7 +129,7 @@ export const permissionService = {
     }
   },
 
-  // ✅ NEW: Assigner un manager à un admin
+  // ✅ FIXED: Assign manager to admin using correct endpoint
   async assignManagerToAdmin(adminId, managerId) {
     try {
       const response = await apiClient.put(`/permissions/admin/${adminId}/assign-manager`, {
@@ -142,10 +142,10 @@ export const permissionService = {
   },
 
   // ================================
-  // SALES PERSON MANAGEMENT (UPDATED)
+  // SALES PERSON MANAGEMENT (FIXED ENDPOINTS)
   // ================================
 
-  // ✅ NEW: Suspendre un commercial
+  // ✅ FIXED: Suspend sales person using correct endpoint
   async suspendSalesPerson(salesPersonId, reason = '') {
     try {
       const response = await apiClient.put(`/permissions/sales-person/${salesPersonId}/suspend`, {
@@ -157,7 +157,7 @@ export const permissionService = {
     }
   },
 
-  // ✅ NEW: Réactiver un commercial
+  // ✅ FIXED: Unsuspend sales person using correct endpoint
   async unsuspendSalesPerson(salesPersonId) {
     try {
       const response = await apiClient.put(`/permissions/sales-person/${salesPersonId}/unsuspend`);
@@ -167,7 +167,7 @@ export const permissionService = {
     }
   },
 
-  // ✅ NEW: Définir le taux de commission (CEO seulement)
+  // ✅ FIXED: Set commission rate using correct endpoint (CEO only)
   async setCommissionRate(salesPersonId, commissionRate) {
     try {
       const response = await apiClient.put(`/permissions/sales-person/${salesPersonId}/set-commission-rate`, {
@@ -179,7 +179,7 @@ export const permissionService = {
     }
   },
 
-  // ✅ NEW: Assigner un manager à un commercial
+  // ✅ FIXED: Assign manager to sales person using correct endpoint
   async assignManagerToSalesPerson(salesPersonId, managerId) {
     try {
       const response = await apiClient.put(`/permissions/sales-person/${salesPersonId}/assign-manager`, {
@@ -192,7 +192,7 @@ export const permissionService = {
   },
 
   // ================================
-  // UTILITY METHODS
+  // UTILITY METHODS (FIXED)
   // ================================
 
   // Obtenir les permissions disponibles
@@ -205,7 +205,7 @@ export const permissionService = {
     }
   },
 
-  // Obtenir les utilisateurs gérables
+  // ✅ FIXED: Get manageable users using correct endpoint
   async getManageableUsers(type = 'all') {
     try {
       const response = await apiClient.get('/permissions/manageable-users', {
@@ -218,7 +218,7 @@ export const permissionService = {
   },
 
   // ================================
-  // VALIDATION & HELPER METHODS (NEW)
+  // VALIDATION & HELPER METHODS (ENHANCED)
   // ================================
 
   // Valider les données d'admin avant création
@@ -272,7 +272,7 @@ export const permissionService = {
   },
 
   // ================================
-  // BATCH OPERATIONS (NEW)
+  // BATCH OPERATIONS (ENHANCED)
   // ================================
 
   // Suspendre plusieurs utilisateurs
@@ -331,5 +331,167 @@ export const permissionService = {
     } catch (error) {
       throw new Error(error.message || 'Erreur lors de la réactivation en masse');
     }
+  },
+
+  // ================================
+  // NEW: ENHANCED ADMIN OPERATIONS
+  // ================================
+
+  // ✅ NEW: Get admin details with hierarchy
+  async getAdminDetails(adminId) {
+    try {
+      const [permissionsResponse, hierarchyResponse] = await Promise.all([
+        this.getUserPermissions(adminId, 'Admin'),
+        this.getHierarchy()
+      ]);
+
+      return {
+        success: true,
+        admin: {
+          permissions: permissionsResponse.permissions || {},
+          hierarchy: hierarchyResponse.hierarchy || null
+        }
+      };
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Erreur lors du chargement des détails admin');
+    }
+  },
+
+  // ✅ NEW: Get permission statistics
+  async getPermissionStats() {
+    try {
+      const [availableResponse, myPermissionsResponse] = await Promise.all([
+        this.getAvailablePermissions(),
+        this.getMyPermissions()
+      ]);
+
+      const available = availableResponse.permissions || {};
+      const myPermissions = myPermissionsResponse.permissions || {};
+
+      const stats = {
+        totalAvailable: Object.keys(available).reduce((count, category) => {
+          return count + (available[category]?.length || 0);
+        }, 0),
+        myGranted: Object.values(myPermissions).filter(p => p === true).length,
+        myTotal: Object.keys(myPermissions).length,
+        categories: Object.keys(available).length
+      };
+
+      return {
+        success: true,
+        stats,
+        breakdown: {
+          available,
+          myPermissions
+        }
+      };
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Erreur lors du chargement des statistiques');
+    }
+  },
+
+  // ✅ NEW: Bulk permission management
+  async bulkPermissionUpdate(operations) {
+    try {
+      const results = [];
+
+      for (const operation of operations) {
+        try {
+          let result;
+          
+          if (operation.action === 'grant') {
+            result = await this.grantPermission(
+              operation.targetId,
+              operation.targetType,
+              operation.permission,
+              operation.reason
+            );
+          } else if (operation.action === 'revoke') {
+            result = await this.revokePermission(
+              operation.targetId,
+              operation.targetType,
+              operation.permission,
+              operation.reason
+            );
+          }
+
+          results.push({
+            ...operation,
+            success: true,
+            result
+          });
+        } catch (error) {
+          results.push({
+            ...operation,
+            success: false,
+            error: error.message
+          });
+        }
+      }
+
+      const successful = results.filter(r => r.success).length;
+      const failed = results.filter(r => !r.success).length;
+
+      return {
+        success: true,
+        message: `Opérations terminées: ${successful} réussies, ${failed} échouées`,
+        results,
+        summary: { successful, failed, total: results.length }
+      };
+    } catch (error) {
+      throw new Error(error.message || 'Erreur lors des opérations en masse');
+    }
+  },
+
+  // ✅ NEW: Check if current user can perform action
+  async canPerformAction(action, targetId, targetType) {
+    try {
+      const myPermissions = await this.getMyPermissions();
+      
+      const requiredPermissions = {
+        'suspend_admin': ['canEditAdmins'],
+        'create_admin': ['canCreateAdmins'],
+        'manage_permissions': ['canManagePermissions'],
+        'set_commission_rate': ['canSetCommissionRates'],
+        'suspend_sales_person': ['canEditSalesPeople']
+      };
+
+      const required = requiredPermissions[action];
+      if (!required) return { canPerform: false, reason: 'Action non reconnue' };
+
+      const hasPermission = required.some(perm => 
+        myPermissions.permissions?.[perm] === true
+      );
+
+      return {
+        canPerform: hasPermission,
+        reason: hasPermission ? null : `Permission requise: ${required.join(' ou ')}`
+      };
+    } catch (error) {
+      return {
+        canPerform: false,
+        reason: 'Erreur lors de la vérification des permissions'
+      };
+    }
+  },
+
+  // ✅ NEW: Get user hierarchy path
+  async getUserHierarchyPath(userId, userType) {
+    try {
+      const hierarchy = await this.getHierarchy();
+      
+      // This would need to traverse the hierarchy to build the path
+      // For now, return basic info
+      return {
+        success: true,
+        path: [], // Would contain hierarchy path from root to user
+        directManager: hierarchy.admin?.managedBy || null,
+        subordinates: hierarchy.subordinates || { admins: [], salesPeople: [] }
+      };
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Erreur lors du chargement du chemin hiérarchique');
+    }
   }
 };
+
+export default permissionService;

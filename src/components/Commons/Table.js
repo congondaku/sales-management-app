@@ -112,15 +112,22 @@ const Table = ({
     const value = row[column.key];
 
     if (column.render) {
-      return column.render(value, row);
+      // ✅ FIXED: Pass additional context for selection columns
+      const context = {
+        selectedRows,
+        onSelectionChange,
+        handleSelectRow
+      };
+      return column.render(value, row, context);
     }
 
     if (column.type === 'badge') {
       const badgeConfig = column.badgeConfig || {};
       const badgeClass = badgeConfig[value] || 'bg-gray-100 text-gray-800';
+      const formatValue = column.formatValue || ((val, row) => val);
       return (
         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${badgeClass}`}>
-          {column.formatValue ? column.formatValue(value) : value}
+          {formatValue(value, row)}
         </span>
       );
     }
@@ -141,7 +148,7 @@ const Table = ({
     }
 
     if (column.formatValue) {
-      return column.formatValue(value);
+      return column.formatValue(value, row);
     }
 
     return value || '-';
@@ -407,7 +414,7 @@ export const TableActions = ({ actions = [], row }) => {
   );
 };
 
-// Types de colonnes prédéfinies
+// ✅ FIXED: Enhanced createColumn with selection method
 export const createColumn = {
   text: (key, header, options = {}) => ({
     key,
@@ -464,6 +471,33 @@ export const createColumn = {
     header: 'Actions',
     sortable: false,
     render: (_, row) => <TableActions actions={actions} row={row} />,
+    ...options
+  }),
+
+  // ✅ FIXED: Simplified selection method
+  selection: (options = {}) => ({
+    key: '__selection__',
+    header: '',
+    sortable: false,
+    width: '50px',
+    render: (value, row, context) => {
+      const rowId = row.id || row._id;
+      const isSelected = context?.selectedRows?.includes(rowId) || false;
+      
+      return (
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={(e) => {
+            e.stopPropagation();
+            if (context?.handleSelectRow) {
+              context.handleSelectRow(rowId, e.target.checked);
+            }
+          }}
+          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+        />
+      );
+    },
     ...options
   })
 };

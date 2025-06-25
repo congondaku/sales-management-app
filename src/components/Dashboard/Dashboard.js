@@ -25,27 +25,29 @@ const Dashboard = () => {
       
       // Check if user has analytics permission
       if (hasPermission(user, 'canViewAnalytics')) {
-        // Load full analytics data
         const response = await analyticsService.getAnalyticsOverview(period);
         
         if (response.success) {
-          // Map the analytics data to dashboard format
+          const analyticsData = response.analytics;
+          
+          // Map the backend data to dashboard format
           const dashboardData = {
-            salesPeople: response.analytics?.overview?.totalSalesPeople || 0,
-            totalUsers: response.analytics?.overview?.totalUsers || 0,
-            totalCommissions: response.analytics?.overview?.totalCommissionAmount || 0,
-            conversionRate: calculateConversionRate(response.analytics),
+            salesPeople: analyticsData.overview?.totalSalesPeople || 0,
+            totalUsers: analyticsData.overview?.totalUsers || 0,
+            totalCommissions: analyticsData.overview?.totalCommissionAmount || 0,
+            conversionRate: analyticsData.overview?.conversionRate || 0,
             
-            // Map other data
-            commissionStats: response.analytics?.commissionsByStatus || [],
-            topPerformers: response.analytics?.topPerformers || [],
-            userRegistrationTrend: response.analytics?.registrationTrend || [],
+            commissionStats: analyticsData.commissionsByStatus || [],
+            topPerformers: analyticsData.topPerformers || [],
+            userRegistrationTrend: analyticsData.registrationTrend || [],
             
-            // Add some trend calculations
+            // Trend calculations (placeholder)
             salesPeopleTrend: null,
             usersTrend: null,
             commissionsTrend: null,
-            conversionTrend: null
+            conversionTrend: null,
+
+            hideDetailedEarnings: analyticsData.hideDetailedEarnings || false
           };
           
           setDashboardData(dashboardData);
@@ -53,7 +55,7 @@ const Dashboard = () => {
           setError(response.message || 'Erreur lors du chargement du tableau de bord');
         }
       } else {
-        // Load basic dashboard data without analytics
+        // Load basic dashboard data for users without analytics permission
         await loadBasicDashboardData();
       }
     } catch (error) {
@@ -88,16 +90,6 @@ const Dashboard = () => {
       console.error('Erreur lors du chargement des données de base:', error);
       setError('Erreur lors du chargement des données de base');
     }
-  };
-
-  // Helper function to calculate conversion rate
-  const calculateConversionRate = (analytics) => {
-    if (!analytics?.overview) return 0;
-    
-    const { totalUsers, totalCommissionCount } = analytics.overview;
-    if (totalUsers === 0) return 0;
-    
-    return Math.round((totalCommissionCount / totalUsers) * 100);
   };
 
   if (loading) {
@@ -251,15 +243,19 @@ const Dashboard = () => {
                       <div className="flex items-center space-x-3">
                         <div className={`w-3 h-3 rounded-full ${
                           stat._id === 'confirmed' ? 'bg-green-500' :
-                          stat._id === 'paid_out' ? 'bg-blue-500' : 'bg-yellow-500'
+                          stat._id === 'paid_out' ? 'bg-blue-500' : 
+                          stat._id === 'pending' ? 'bg-yellow-500' : 'bg-gray-500'
                         }`}></div>
                         <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                           {stat._id === 'confirmed' ? 'Confirmées' :
-                           stat._id === 'paid_out' ? 'Payées' : 'En attente'}
+                           stat._id === 'paid_out' ? 'Payées' : 
+                           stat._id === 'pending' ? 'En attente' : 
+                           stat._id === 'cancelled' ? 'Annulées' : stat._id}
                         </span>
                       </div>
                       <div className="text-right">
                         <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                          {/* ✅ FIXED: Handle both number and string values */}
                           {typeof stat.total === 'number' ? formatCurrency(stat.total) : (stat.total || 'N/A')}
                         </p>
                         <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -309,7 +305,7 @@ const Dashboard = () => {
               
               <div className="space-y-4">
                 {dashboardData.topPerformers.slice(0, 5).map((performer, index) => (
-                  <div key={performer.salesPersonId} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <div key={performer.salesPersonId || index} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
                     <div className="flex items-center space-x-4">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${
                         index === 0 ? 'bg-yellow-500' :
@@ -320,10 +316,10 @@ const Dashboard = () => {
                       </div>
                       <div>
                         <p className="font-medium text-gray-900 dark:text-white">
-                          {performer.name}
+                          {performer.name || 'Nom non disponible'}
                         </p>
                         <p className="text-sm text-gray-500 dark:text-gray-400">
-                          {performer.salesId} • {performer.territory}
+                          {performer.salesId ? `${performer.salesId} • ` : ''}{performer.territory || 'Territoire non défini'}
                         </p>
                       </div>
                     </div>
@@ -331,10 +327,10 @@ const Dashboard = () => {
                       <p className="font-semibold text-gray-900 dark:text-white">
                         {typeof performer.totalEarnings === 'number' 
                           ? formatCurrency(performer.totalEarnings) 
-                          : performer.totalEarnings}
+                          : performer.totalEarnings || 'N/A'}
                       </p>
                       <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {performer.totalCommissions} commission{performer.totalCommissions > 1 ? 's' : ''}
+                        {performer.totalCommissions || 0} commission{(performer.totalCommissions || 0) > 1 ? 's' : ''}
                       </p>
                     </div>
                   </div>
