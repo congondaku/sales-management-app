@@ -118,8 +118,8 @@ const LoginForm = () => {
                 autoComplete="email"
                 autoFocus
                 style={{ 
-                  color: '#111827', // Ensure dark text
-                  backgroundColor: '#ffffff' // Ensure white background
+                  color: '#111827',
+                  backgroundColor: '#ffffff'
                 }}
               />
             </div>

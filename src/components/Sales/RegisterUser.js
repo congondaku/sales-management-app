@@ -1,4 +1,3 @@
-// src/components/Sales/RegisterUser.js
 import React, { useState } from 'react';
 import { 
   UserPlus, 
@@ -14,8 +13,9 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { salesPersonAuthService } from '../../services/sales-person-auth.service';
+import { apiHelpers } from '../../services/api';
 import LoadingSpinner from '../Commons/LoadingSpinner';
-import { validateEmail, validatePhone } from '../../utils/validators';
+import { validateEmail, validatePhone, validateName } from '../../utils/validators';
 
 const RegisterUser = () => {
   const { user } = useAuth();
@@ -52,42 +52,38 @@ const RegisterUser = () => {
   const validateForm = () => {
     const newErrors = {};
 
-    // First Name
-    if (!formData.firstName.trim()) {
-      newErrors.firstName = 'Le prénom est requis';
-    } else if (formData.firstName.trim().length < 2) {
-      newErrors.firstName = 'Le prénom doit contenir au moins 2 caractères';
+    // First Name validation
+    const firstNameValidation = validateName(formData.firstName, 'prénom');
+    if (!firstNameValidation.isValid) {
+      newErrors.firstName = firstNameValidation.errors[0];
     }
 
-    // Last Name
-    if (!formData.lastName.trim()) {
-      newErrors.lastName = 'Le nom est requis';
-    } else if (formData.lastName.trim().length < 2) {
-      newErrors.lastName = 'Le nom doit contenir au moins 2 caractères';
+    // Last Name validation
+    const lastNameValidation = validateName(formData.lastName, 'nom');
+    if (!lastNameValidation.isValid) {
+      newErrors.lastName = lastNameValidation.errors[0];
     }
 
-    // Email
-    if (!formData.email.trim()) {
-      newErrors.email = 'L\'email est requis';
-    } else if (!validateEmail(formData.email)) {
-      newErrors.email = 'Format d\'email invalide';
+    // Email validation
+    const emailValidation = validateEmail(formData.email);
+    if (!emailValidation.isValid) {
+      newErrors.email = emailValidation.errors[0];
     }
 
-    // Phone
-    if (!formData.phoneNumber.trim()) {
-      newErrors.phoneNumber = 'Le numéro de téléphone est requis';
-    } else if (!validatePhone(formData.phoneNumber)) {
-      newErrors.phoneNumber = 'Format de téléphone invalide';
+    // Phone validation
+    const phoneValidation = validatePhone(formData.phoneNumber);
+    if (!phoneValidation.isValid) {
+      newErrors.phoneNumber = phoneValidation.errors[0];
     }
 
-    // Password
+    // Password validation
     if (!formData.password) {
       newErrors.password = 'Le mot de passe est requis';
     } else if (formData.password.length < 8) {
       newErrors.password = 'Le mot de passe doit contenir au moins 8 caractères';
     }
 
-    // Confirm Password
+    // Confirm Password validation
     if (!formData.confirmPassword) {
       newErrors.confirmPassword = 'Confirmez le mot de passe';
     } else if (formData.password !== formData.confirmPassword) {
@@ -140,7 +136,7 @@ const RegisterUser = () => {
       }
     } catch (error) {
       console.error('Erreur inscription:', error);
-      setErrors({ submit: 'Erreur de connexion au serveur' });
+      setErrors({ submit: apiHelpers.formatError(error) });
     } finally {
       setLoading(false);
     }

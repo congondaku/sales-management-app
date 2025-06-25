@@ -1,4 +1,3 @@
-// src/components/Sales/SalesDashboard.js
 import React, { useState, useEffect } from 'react';
 import { 
   Users, 
@@ -11,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { salesPersonAuthService } from '../../services/sales-person-auth.service';
+import { apiHelpers } from '../../services/api';
 import StatCard from '../Dashboard/StatCard';
 import LoadingSpinner, { SectionSpinner } from '../Commons/LoadingSpinner';
 import { formatCurrency, formatNumber } from '../../utils/helpers';
@@ -39,7 +39,7 @@ const SalesDashboard = () => {
       }
     } catch (error) {
       console.error('Erreur dashboard commercial:', error);
-      setError('Erreur de connexion au serveur');
+      setError(apiHelpers.formatError(error));
     } finally {
       setLoading(false);
     }
@@ -117,7 +117,7 @@ const SalesDashboard = () => {
         />
         <StatCard
           title="Performance"
-          value={dashboardData?.performance?.weekly?.achievementPercentage || 0 + '%'}
+          value={`${dashboardData?.performance?.weekly?.achievementPercentage || 0}%`}
           icon={Target}
           color="purple"
           subtitle="Objectif hebdomadaire"

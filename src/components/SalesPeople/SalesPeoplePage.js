@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Filter, Eye, Edit, Trash2, UserPlus, MapPin, Target, Percent, UserX, UserCheck, DollarSign } from 'lucide-react';
+import { Plus, Search, Filter, Eye, Edit, Trash2, UserPlus, MapPin, Target, Percent, UserX, UserCheck, DollarSign, Download, RefreshCw } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { salesService } from '../../services/sales.service';
+import { permissionService } from '../../services/permission.service';
+import { analyticsService } from '../../services/analytics.service';
+import { apiHelpers } from '../../services/api';
 import { hasPermission } from '../../utils/permissions';
 import { formatFullName, formatPhoneDisplay, formatTerritory } from '../../utils/formatters';
 import Table, { createColumn, TableActions } from '../Commons/Table';
@@ -35,6 +38,9 @@ const SalesPeoplePage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [performanceStats, setPerformanceStats] = useState(null);
+  const [selectedRows, setSelectedRows] = useState([]);
+  const [error, setError] = useState(null);
+  const [exporting, setExporting] = useState(false);
 
   const { ConfirmDialogComponent, confirmDelete, confirmAction } = useConfirmDialog();
 
@@ -56,6 +62,8 @@ const SalesPeoplePage = () => {
   const loadSalesPeople = async () => {
     try {
       setLoading(true);
+      setError(null);
+      
       const params = {
         page: currentPage,
         limit: itemsPerPage,
@@ -72,23 +80,38 @@ const SalesPeoplePage = () => {
       } else {
         console.error('Erreur:', response.message);
         setSalesPeople([]); // Set empty array on error
+        setError(response.message || 'Erreur lors du chargement des commerciaux');
       }
     } catch (error) {
       console.error('Erreur lors du chargement des commerciaux:', error);
       setSalesPeople([]); // Set empty array on error
+      setError(apiHelpers.formatError(error));
     } finally {
       setLoading(false);
     }
   };
 
+  // ✅ FIXED: Use available analytics service
   const loadPerformanceStats = async () => {
     try {
-      const response = await salesService.getPerformanceStats();
+      if (!hasPermission(user, 'canViewAnalytics')) {
+        return; // Skip if user doesn't have permission
+      }
+
+      const response = await analyticsService.getSalesPerformance({ period: 'month' });
       if (response.success) {
-        setPerformanceStats(response.stats);
+        // Calculate stats from the analytics data
+        const stats = {
+          totalActive: response.analytics?.salesPeople?.filter(sp => sp.salesPerson?.isActive).length || 0,
+          avgPerformance: response.analytics?.summary?.averageTargetAchievement || 0,
+          totalCommissions: response.analytics?.summary?.totalCommissions || 0,
+          totalSuspended: response.analytics?.salesPeople?.filter(sp => sp.salesPerson?.isSuspended).length || 0
+        };
+        setPerformanceStats(stats);
       }
     } catch (error) {
       console.error('Erreur lors du chargement des statistiques:', error);
+      // Don't show error for stats, just log it
     }
   };
 
@@ -136,7 +159,9 @@ const SalesPeoplePage = () => {
     setShowTargetsModal(true);
   };
 
+  // ✅ FIXED: Use permission service methods
   const handleSuspend = async (salesperson) => {
+    const reason = prompt('Raison de la suspension:') || 'Suspendu par l\'administrateur';
     const confirmed = await confirmAction(
       `suspendre ${formatFullName(salesperson.firstName, salesperson.lastName)}`,
       () => { }
@@ -144,12 +169,14 @@ const SalesPeoplePage = () => {
 
     if (confirmed) {
       try {
-        const response = await salesService.suspendSalesPerson(salesperson._id);
+        const response = await permissionService.suspendSalesPerson(salesperson._id, reason);
         if (response.success) {
           loadSalesPeople();
+          loadPerformanceStats();
         }
       } catch (error) {
         console.error('Erreur lors de la suspension:', error);
+        setError(apiHelpers.formatError(error));
       }
     }
   };
@@ -162,12 +189,14 @@ const SalesPeoplePage = () => {
 
     if (confirmed) {
       try {
-        const response = await salesService.unsuspendSalesPerson(salesperson._id);
+        const response = await permissionService.unsuspendSalesPerson(salesperson._id);
         if (response.success) {
           loadSalesPeople();
+          loadPerformanceStats();
         }
       } catch (error) {
         console.error('Erreur lors de la réactivation:', error);
+        setError(apiHelpers.formatError(error));
       }
     }
   };
@@ -184,10 +213,89 @@ const SalesPeoplePage = () => {
           }
         } catch (error) {
           console.error('Erreur lors de la suppression:', error);
+          setError(apiHelpers.formatError(error));
         }
       },
       "Cette action supprimera également tous les liens avec les utilisateurs et les commissions associées."
     );
+  };
+
+  // ✅ NEW: Export functionality
+  const handleExport = async (format = 'csv') => {
+    try {
+      setExporting(true);
+      const exportData = await salesService.exportSalesPeople(filters, format);
+      
+      // Create and trigger download
+      const blob = new Blob([exportData.content], { type: exportData.mimeType });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = exportData.filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Erreur lors de l\'export:', error);
+      setError(apiHelpers.formatError(error));
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  // ✅ NEW: Batch operations
+  const handleBatchSuspend = async () => {
+    if (selectedRows.length === 0) {
+      alert('Veuillez sélectionner des commerciaux à suspendre');
+      return;
+    }
+
+    const reason = prompt('Raison de la suspension en masse:') || 'Suspension en masse';
+    const confirmed = await confirmAction(
+      `suspendre ${selectedRows.length} commerciaux`,
+      () => { }
+    );
+
+    if (confirmed) {
+      try {
+        const response = await permissionService.batchSuspendUsers(selectedRows, 'SalesPerson', reason);
+        if (response.success) {
+          loadSalesPeople();
+          loadPerformanceStats();
+          setSelectedRows([]);
+        }
+      } catch (error) {
+        console.error('Erreur lors de la suspension en masse:', error);
+        setError(apiHelpers.formatError(error));
+      }
+    }
+  };
+
+  const handleBatchUnsuspend = async () => {
+    if (selectedRows.length === 0) {
+      alert('Veuillez sélectionner des commerciaux à réactiver');
+      return;
+    }
+
+    const confirmed = await confirmAction(
+      `réactiver ${selectedRows.length} commerciaux`,
+      () => { }
+    );
+
+    if (confirmed) {
+      try {
+        const response = await permissionService.batchUnsuspendUsers(selectedRows, 'SalesPerson');
+        if (response.success) {
+          loadSalesPeople();
+          loadPerformanceStats();
+          setSelectedRows([]);
+        }
+      } catch (error) {
+        console.error('Erreur lors de la réactivation en masse:', error);
+        setError(apiHelpers.formatError(error));
+      }
+    }
   };
 
   const handleSearch = () => {
@@ -201,8 +309,32 @@ const SalesPeoplePage = () => {
     goToPage(1);
   };
 
-  // Configuration des colonnes du tableau
+  // ✅ NEW: Advanced search
+  const handleAdvancedSearch = async (searchParams) => {
+    try {
+      setLoading(true);
+      const response = await salesService.searchSalesPeople(searchParams);
+      if (response.success) {
+        setSalesPeople(response.salesPeople || []);
+        setTotalCount(response.pagination?.total || 0);
+      }
+    } catch (error) {
+      console.error('Erreur lors de la recherche avancée:', error);
+      setError(apiHelpers.formatError(error));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Configuration des colonnes du tableau avec sélection
   const columns = [
+    // ✅ NEW: Selection column for batch operations
+    createColumn.selection({
+      selectedRows,
+      onSelectionChange: setSelectedRows,
+      disabled: (row) => !hasPermission(user, 'canEditSalesPeople')
+    }),
+
     createColumn.custom('name', 'Commercial', (_, row) => (
       <div className="flex items-center">
         <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/20 rounded-full flex items-center justify-center relative">
@@ -277,16 +409,12 @@ const SalesPeoplePage = () => {
 
     createColumn.custom('commission', 'Commission', (_, row) => (
       <div>
-        {row.commissionRate ? (
+        {/* Hide commission rates if user doesn't have permission */}
+        {hasPermission(user, 'canSeeCommissionRates') ? (
           <div>
             <div className="text-sm text-gray-900 dark:text-white">
-              {row.commissionRate.base}% / {row.commissionRate.paid}%
+              {row.commissionRate ? `${(row.commissionRate * 100).toFixed(1)}%` : 'Non défini'}
             </div>
-            {row.commissionRate.bonusRate > 0 && (
-              <div className="text-xs text-purple-600 dark:text-purple-400">
-                Bonus: {row.commissionRate.bonusRate}% (seuil: {row.commissionRate.bonusThreshold})
-              </div>
-            )}
             <div className="text-xs text-gray-500 dark:text-gray-400">
               Dernier paiement: {row.lastCommissionDate ?
                 new Date(row.lastCommissionDate).toLocaleDateString('fr-FR') :
@@ -295,7 +423,7 @@ const SalesPeoplePage = () => {
             </div>
           </div>
         ) : (
-          <span className="text-sm text-gray-500 dark:text-gray-400">Non défini</span>
+          <span className="text-sm text-gray-500 dark:text-gray-400">Taux masqué</span>
         )}
       </div>
     )),
@@ -373,6 +501,21 @@ const SalesPeoplePage = () => {
 
   return (
     <div className="space-y-6">
+      {/* Error display */}
+      {error && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <p className="text-red-800 dark:text-red-200">{error}</p>
+            <button
+              onClick={() => setError(null)}
+              className="text-red-600 hover:text-red-800"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* En-tête avec actions */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
         <div>
@@ -384,19 +527,74 @@ const SalesPeoplePage = () => {
           </p>
         </div>
 
-        {hasPermission(user, 'canCreateSalesPeople') && (
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center space-x-2 transition-colors"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Nouveau Commercial</span>
-          </button>
-        )}
+        <div className="flex space-x-2">
+          {/* Export buttons */}
+          {hasPermission(user, 'canViewAllSalesPeople') && (
+            <div className="flex space-x-2">
+              <button
+                onClick={() => handleExport('csv')}
+                disabled={exporting}
+                className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 flex items-center space-x-2 disabled:opacity-50"
+              >
+                <Download className="h-4 w-4" />
+                <span>{exporting ? 'Export...' : 'CSV'}</span>
+              </button>
+              <button
+                onClick={() => handleExport('json')}
+                disabled={exporting}
+                className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 flex items-center space-x-2 disabled:opacity-50"
+              >
+                <Download className="h-4 w-4" />
+                <span>JSON</span>
+              </button>
+            </div>
+          )}
+
+          {hasPermission(user, 'canCreateSalesPeople') && (
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center space-x-2 transition-colors"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Nouveau Commercial</span>
+            </button>
+          )}
+        </div>
       </div>
 
+      {/* Batch operations */}
+      {selectedRows.length > 0 && hasPermission(user, 'canEditSalesPeople') && (
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <span className="text-blue-800 dark:text-blue-200">
+              {selectedRows.length} commercial{selectedRows.length > 1 ? 'aux' : ''} sélectionné{selectedRows.length > 1 ? 's' : ''}
+            </span>
+            <div className="flex space-x-2">
+              <button
+                onClick={handleBatchSuspend}
+                className="bg-orange-600 text-white px-3 py-1 rounded text-sm hover:bg-orange-700"
+              >
+                Suspendre
+              </button>
+              <button
+                onClick={handleBatchUnsuspend}
+                className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
+              >
+                Réactiver
+              </button>
+              <button
+                onClick={() => setSelectedRows([])}
+                className="bg-gray-600 text-white px-3 py-1 rounded text-sm hover:bg-gray-700"
+              >
+                Annuler
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Statistiques de performance */}
-      {performanceStats && (
+      {performanceStats && hasPermission(user, 'canViewAnalytics') && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
             <div className="flex items-center">
@@ -437,7 +635,10 @@ const SalesPeoplePage = () => {
               </div>
               <div className="ml-4">
                 <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                  ${performanceStats.totalCommissions?.toLocaleString() || '0'}
+                  {hasPermission(user, 'canSeeCommissionRates') 
+                    ? `$${performanceStats.totalCommissions?.toLocaleString() || '0'}`
+                    : 'Masqué'
+                  }
                 </div>
                 <div className="text-sm text-gray-600 dark:text-gray-400">
                   Commissions ce mois
@@ -529,6 +730,14 @@ const SalesPeoplePage = () => {
             >
               Effacer
             </button>
+
+            <button
+              onClick={() => loadSalesPeople()}
+              className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 flex items-center space-x-2"
+            >
+              <RefreshCw className="h-4 w-4" />
+              <span>Actualiser</span>
+            </button>
           </div>
         </div>
       </div>
@@ -541,6 +750,9 @@ const SalesPeoplePage = () => {
         emptyMessage="Aucun commercial trouvé"
         onRowClick={handleViewDetails}
         className="cursor-pointer"
+        selectable={hasPermission(user, 'canEditSalesPeople')}
+        selectedRows={selectedRows}
+        onSelectionChange={setSelectedRows}
       />
 
       {/* Pagination */}

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { salesPersonAuthService } from '../../services/sales-person-auth.service';
+import { apiHelpers } from '../../services/api';
 import LoadingSpinner, { SectionSpinner } from '../Commons/LoadingSpinner';
 import { formatCurrency, formatDate } from '../../utils/helpers';
 import Pagination from '../Commons/Paginations';
@@ -42,15 +43,15 @@ const MyCommissions = () => {
       const response = await salesPersonAuthService.getMyCommissions(filters);
       
       if (response.success) {
-        setCommissions(response.commissions);
-        setSummary(response.summary);
-        setPagination(response.pagination);
+        setCommissions(response.commissions || []);
+        setSummary(response.summary || []);
+        setPagination(response.pagination || {});
       } else {
         setError(response.message || 'Erreur lors du chargement des commissions');
       }
     } catch (error) {
       console.error('Erreur commissions:', error);
-      setError('Erreur de connexion au serveur');
+      setError(apiHelpers.formatError(error));
     } finally {
       setLoading(false);
     }
@@ -113,6 +114,39 @@ const MyCommissions = () => {
     }
   };
 
+  const handleExport = async () => {
+    try {
+      // Create CSV content
+      const csvHeaders = ['Date', 'Client', 'Email', 'Montant', 'Statut', 'Type'];
+      const csvRows = commissions.map(commission => [
+        formatDate(commission.createdAt),
+        `${commission.userId?.firstName || ''} ${commission.userId?.lastName || ''}`.trim(),
+        commission.userId?.email || '',
+        formatCurrency(commission.commissionAmount),
+        getStatusLabel(commission.status),
+        commission.planId || 'Plan Standard'
+      ]);
+
+      const csvContent = [
+        csvHeaders.join(','),
+        ...csvRows.map(row => row.map(cell => `"${cell}"`).join(','))
+      ].join('\n');
+
+      // Download CSV
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `mes_commissions_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Erreur lors de l\'export:', error);
+    }
+  };
+
   if (loading && commissions.length === 0) {
     return <SectionSpinner text="Chargement de vos commissions..." />;
   }
@@ -131,7 +165,11 @@ const MyCommissions = () => {
         </div>
         
         <div className="flex items-center space-x-3">
-          <button className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+          <button 
+            onClick={handleExport}
+            disabled={commissions.length === 0}
+            className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
             <Download className="h-4 w-4" />
             <span>Exporter</span>
           </button>
@@ -139,7 +177,7 @@ const MyCommissions = () => {
       </div>
 
       {/* Summary Cards */}
-      {summary && (
+      {summary && summary.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {summary.map((stat) => (
             <div key={stat._id} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
@@ -312,7 +350,7 @@ const MyCommissions = () => {
                         {formatCurrency(commission.commissionAmount)}
                       </p>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
-                        USD
+                        {commission.currency || 'USD'}
                       </p>
                     </div>
 
@@ -361,7 +399,12 @@ const MyCommissions = () => {
           <Pagination
             currentPage={pagination.page}
             totalPages={pagination.pages}
+            totalItems={pagination.total}
+            itemsPerPage={pagination.limit}
             onPageChange={handlePageChange}
+            onItemsPerPageChange={(newLimit) => handleFilterChange('limit', newLimit)}
+            showItemsPerPage={true}
+            showPageInfo={true}
           />
         </div>
       )}

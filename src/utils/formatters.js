@@ -295,3 +295,48 @@ export const formatCoordinates = (lat, lng, precision = 4) => {
   
   return `${lat.toFixed(precision)}, ${lng.toFixed(precision)}`;
 };
+
+export const formatDate = (date, options = {}) => {
+  if (!date) return 'Date non définie';
+  
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  
+  const defaultOptions = {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    ...options
+  };
+  
+  return new Intl.DateTimeFormat('fr-FR', defaultOptions).format(dateObj);
+};
+
+// Formater une date avec heure
+export const formatDateTime = (date) => {
+  if (!date) return 'Date non définie';
+  
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  
+  return new Intl.DateTimeFormat('fr-FR', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(dateObj);
+};
+
+// Formater une devise (alias pour formatCommissionAmount)
+export const formatCurrency = (amount, currency = 'EUR') => {
+  return formatCommissionAmount(amount, currency, false);
+};
+
+// Formater un nombre simple
+export const formatNumber = (number, decimals = 0) => {
+  if (typeof number !== 'number' || isNaN(number)) return '0';
+  
+  return new Intl.NumberFormat('fr-FR', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals
+  }).format(number);
+};

@@ -572,3 +572,6 @@ export const validateSearchFilters = (filters) => {
     errors
   };
 };
+
+
+//validator.js

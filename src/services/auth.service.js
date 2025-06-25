@@ -12,6 +12,12 @@ export const authService = {
         email,
         password
       });
+      
+      if (response.data.success) {
+        // Sauvegarder les données d'authentification
+        this.saveAuthData(response.data);
+      }
+      
       return response.data;
     } catch (error) {
       throw new Error(error.response?.data?.message || 'Erreur de connexion');
@@ -22,6 +28,12 @@ export const authService = {
   async register(adminData) {
     try {
       const response = await apiClient.post('/admin/register', adminData);
+      
+      if (response.data.success) {
+        // Sauvegarder les données d'authentification
+        this.saveAuthData(response.data);
+      }
+      
       return response.data;
     } catch (error) {
       throw new Error(error.response?.data?.message || 'Erreur d\'inscription');
@@ -30,6 +42,7 @@ export const authService = {
 
   // Déconnexion
   logout() {
+    console.log('🚪 Logging out admin user');
     localStorage.removeItem('admin_token');
     localStorage.removeItem('admin_user');
   },
@@ -53,7 +66,7 @@ export const authService = {
   },
 
   // ================================
-  // ADMIN MANAGEMENT (NEW)
+  // ADMIN MANAGEMENT (ENHANCED)
   // ================================
 
   // Créer un nouvel administrateur
@@ -110,49 +123,17 @@ export const authService = {
     }
   },
 
-  // Suspendre un administrateur
-  async suspendAdmin(adminId, reason = '') {
-    try {
-      const response = await apiClient.put(`/admin/admins/${adminId}/suspend`, { reason });
-      return response.data;
-    } catch (error) {
-      throw new Error(error.response?.data?.message || 'Erreur lors de la suspension');
-    }
-  },
-
-  // Réactiver un administrateur
-  async unsuspendAdmin(adminId) {
-    try {
-      const response = await apiClient.put(`/admin/admins/${adminId}/unsuspend`);
-      return response.data;
-    } catch (error) {
-      throw new Error(error.response?.data?.message || 'Erreur lors de la réactivation');
-    }
-  },
-
   // ================================
-  // HIERARCHY MANAGEMENT (NEW)
+  // HIERARCHY MANAGEMENT (ENHANCED)
   // ================================
 
   // Obtenir la hiérarchie complète
   async getHierarchy() {
     try {
-      const response = await apiClient.get('/admin/hierarchy');
+      const response = await apiClient.get('/permissions/hierarchy');
       return response.data;
     } catch (error) {
       throw new Error(error.response?.data?.message || 'Erreur lors du chargement de la hiérarchie');
-    }
-  },
-
-  // Assigner un manager à un administrateur
-  async assignManagerToAdmin(adminId, managerId) {
-    try {
-      const response = await apiClient.put(`/admin/admins/${adminId}/assign-manager`, {
-        managerId
-      });
-      return response.data;
-    } catch (error) {
-      throw new Error(error.response?.data?.message || 'Erreur lors de l\'assignation du manager');
     }
   },
 
@@ -167,7 +148,7 @@ export const authService = {
   },
 
   // ================================
-  // PROFILE MANAGEMENT (NEW)
+  // PROFILE MANAGEMENT (ENHANCED)
   // ================================
 
   // Obtenir le profil de l'admin connecté
@@ -184,6 +165,12 @@ export const authService = {
   async updateProfile(profileData) {
     try {
       const response = await apiClient.put('/admin/profile', profileData);
+      
+      if (response.data.success) {
+        // Mettre à jour les données locales
+        this.updateLocalUser(response.data.admin);
+      }
+      
       return response.data;
     } catch (error) {
       throw new Error(error.response?.data?.message || 'Erreur lors de la mise à jour du profil');
@@ -191,7 +178,7 @@ export const authService = {
   },
 
   // ================================
-  // DASHBOARD (NEW)
+  // DASHBOARD (ENHANCED)
   // ================================
 
   // Obtenir les données du dashboard
@@ -207,7 +194,7 @@ export const authService = {
   },
 
   // ================================
-  // USER MANAGEMENT (NEW)
+  // USER MANAGEMENT (ENHANCED)
   // ================================
 
   // Obtenir tous les utilisateurs
@@ -241,7 +228,7 @@ export const authService = {
   },
 
   // ================================
-  // VALIDATION HELPERS (NEW)
+  // VALIDATION HELPERS (ENHANCED)
   // ================================
 
   // Vérifier si l'email est disponible
@@ -275,9 +262,36 @@ export const authService = {
       errors.password = 'Le mot de passe doit contenir au moins 8 caractères';
     }
 
+    if (adminData.password && adminData.confirmPassword && adminData.password !== adminData.confirmPassword) {
+      errors.confirmPassword = 'Les mots de passe ne correspondent pas';
+    }
+
     if (!adminData.role) {
       errors.role = 'Le rôle est requis';
     }
+
+    return {
+      isValid: Object.keys(errors).length === 0,
+      errors
+    };
+  },
+
+  // ✅ NEW: Valider les permissions
+  validatePermissions(permissions) {
+    const errors = {};
+    const validPermissions = [
+      'canCreateSalesPeople', 'canEditSalesPeople', 'canDeleteSalesPeople', 'canViewAllSalesPeople',
+      'canViewCommissions', 'canSetCommissionRates', 'canProcessPayouts', 'canSeeCommissionRates',
+      'canCreateAdmins', 'canEditAdmins', 'canDeleteAdmins',
+      'canViewAnalytics', 'canViewAllData',
+      'canManageSystem', 'canManagePermissions'
+    ];
+
+    Object.keys(permissions).forEach(permission => {
+      if (!validPermissions.includes(permission)) {
+        errors[permission] = 'Permission invalide';
+      }
+    });
 
     return {
       isValid: Object.keys(errors).length === 0,
@@ -316,11 +330,12 @@ export const authService = {
   },
 
   // ================================
-  // UTILITY METHODS (NEW)
+  // UTILITY METHODS (ENHANCED)
   // ================================
 
   // Sauvegarder l'utilisateur et le token
   saveAuthData(authData) {
+    console.log('💾 Saving auth data for admin');
     if (authData.token) {
       localStorage.setItem('admin_token', authData.token);
     }
@@ -379,6 +394,86 @@ export const authService = {
     
     // Vérification de la hiérarchie (à implémenter selon la logique métier)
     return this.hasPermission('canEditAdmins');
+  },
+
+  // ✅ NEW: Obtenir le nom complet de l'utilisateur
+  getCurrentUserFullName() {
+    const user = this.getCurrentUser();
+    return user ? `${user.firstName} ${user.lastName}` : '';
+  },
+
+  // ✅ NEW: Obtenir les données d'affichage de l'utilisateur
+  getCurrentUserDisplayData() {
+    const user = this.getCurrentUser();
+    if (!user) return null;
+
+    return {
+      id: user.id,
+      fullName: `${user.firstName} ${user.lastName}`,
+      email: user.email,
+      role: user.role,
+      territory: user.territory,
+      teamName: user.teamName,
+      permissions: user.permissions || {},
+      isCEO: user.role === 'ceo'
+    };
+  },
+
+  // ✅ NEW: Vérifier l'état de la session
+  async checkSession() {
+    if (!this.isAuthenticated()) {
+      return { valid: false, reason: 'No authentication data' };
+    }
+
+    try {
+      await this.verifyToken();
+      return { valid: true };
+    } catch (error) {
+      return { valid: false, reason: error.message };
+    }
+  },
+
+  // ✅ NEW: Nettoyer toutes les données d'authentification
+  clearAllAuthData() {
+    console.log('🧹 Clearing all admin auth data');
+    localStorage.removeItem('admin_token');
+    localStorage.removeItem('admin_user');
+  },
+
+  // ✅ NEW: Auto-refresh token avant expiration
+  setupTokenRefresh(tokenExpiryTime) {
+    // Refresh token 5 minutes before expiry
+    const refreshTime = tokenExpiryTime - (5 * 60 * 1000);
+    const timeUntilRefresh = refreshTime - Date.now();
+
+    if (timeUntilRefresh > 0) {
+      setTimeout(async () => {
+        try {
+          await this.refreshToken();
+          console.log('🔄 Token refreshed automatically');
+        } catch (error) {
+          console.error('❌ Auto token refresh failed:', error);
+          this.logout();
+        }
+      }, timeUntilRefresh);
+    }
+  },
+
+  // ✅ NEW: Obtenir les statistiques de session
+  getSessionStats() {
+    const user = this.getCurrentUser();
+    const token = this.getToken();
+    
+    if (!user || !token) return null;
+
+    return {
+      isAuthenticated: this.isAuthenticated(),
+      userRole: user.role,
+      loginTime: user.lastLogin || 'Unknown',
+      territory: user.territory,
+      permissionsCount: Object.keys(user.permissions || {}).length,
+      isCEO: this.isCEO()
+    };
   }
 };
 

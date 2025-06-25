@@ -525,3 +525,5 @@ export const getEndOfMonth = (date = new Date()) => {
   const dateObj = typeof date === 'string' ? new Date(date) : new Date(date);
   return new Date(dateObj.getFullYear(), dateObj.getMonth() + 1, 0);
 };
+
+//helper.js
