@@ -1,132 +1,139 @@
 import React, { useState } from 'react';
-import { Menu, Bell, Sun, Moon } from 'lucide-react';
-import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../hooks/useAuth';
 import Sidebar from './Sidebar';
 import Header from './Header';
 
-// Import all page components
+// ✅ EXISTING: Admin Components
 import Dashboard from '../Dashboard/Dashboard';
-import SalesDashboard from '../Sales/SalesDashboard';
 import SalesPeoplePage from '../SalesPeople/SalesPeoplePage';
 import CommissionsPage from '../Commissions/CommissionsPage';
 import AnalyticsPage from '../Analytics/AnalyticsPage';
 import UsersPage from '../Users/UsersPage';
 import PermissionsPage from '../Permissions/PermissionsPage';
 import SettingsPage from '../Settings/SettingsPage';
-import AdminManagementPage from '../Admin/AdminManagementPage';
 
-// Sales person specific pages
+// ✅ NEW: Sales Person Components (you'll need to create these)
+import SalesDashboard from '../Sales/SalesDashboard';
 import MyUsers from '../Sales/MyUsers';
 import MyCommissions from '../Sales/MyCommissions';
 import MyPerformance from '../Sales/MyPerformance';
 import RegisterUser from '../Sales/RegisterUser';
-import SalesProfile from '../Sales/SalesProfile';
-
-// ✅ NEW: Organization components
-import OrganizationChart from '../Organization/OrganizationChart';
+import SalesProfile from '../Sales/SalesProfile.js';
 
 const MainLayout = () => {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const { darkMode, toggleDarkMode } = useTheme();
-  const { isAdmin, isSalesPerson } = useAuth();
+  const { userType, isAdmin, isSalesPerson } = useAuth();
 
-  // ✅ ENHANCED: Route handler for both admin and sales person pages
-  const renderCurrentPage = () => {
-    // ✅ NEW: Organization chart available to both admin and sales people
-    if (currentPage === 'organization') {
-      return <OrganizationChart />;
-    }
-
-    // Admin pages
+  // ✅ ENHANCED: Different page configurations based on user type
+  const getPageConfigurations = () => {
     if (isAdmin()) {
-      switch (currentPage) {
-        case 'dashboard':
-          return <Dashboard />;
-        case 'sales-people':
-          return <SalesPeoplePage />;
-        // case 'commissions':
-        //   return <CommissionsPage />;
-        case 'analytics':
-          return <AnalyticsPage />;
-        case 'users':
-          return <UsersPage />;
-        case 'permissions':
-          return <PermissionsPage />;
-        case 'admin-management':
-          return <AdminManagementPage />;
-        case 'settings':
-          return <SettingsPage />;
-        default:
-          return <Dashboard />;
-      }
+      return {
+        dashboard: {
+          title: 'Tableau de Bord',
+          component: Dashboard
+        },
+        'sales-people': {
+          title: 'Gestion des Commerciaux',
+          component: SalesPeoplePage
+        },
+        commissions: {
+          title: 'Gestion des Commissions',
+          component: CommissionsPage
+        },
+        analytics: {
+          title: 'Analyses de Performance',
+          component: AnalyticsPage
+        },
+        users: {
+          title: 'Gestion des Utilisateurs',
+          component: UsersPage
+        },
+        permissions: {
+          title: 'Gestion des Permissions',
+          component: PermissionsPage
+        },
+        settings: {
+          title: 'Paramètres',
+          component: SettingsPage
+        }
+      };
+    } else if (isSalesPerson()) {
+      return {
+        'sales-dashboard': {
+          title: 'Mon Tableau de Bord',
+          component: SalesDashboard
+        },
+        'my-users': {
+          title: 'Mes Utilisateurs',
+          component: MyUsers
+        },
+        'my-commissions': {
+          title: 'Mes Commissions',
+          component: MyCommissions
+        },
+        'my-performance': {
+          title: 'Ma Performance',
+          component: MyPerformance
+        },
+        'register-user': {
+          title: 'Inscrire un Utilisateur',
+          component: RegisterUser
+        },
+        'sales-profile': {
+          title: 'Mon Profil',
+          component: SalesProfile
+        }
+      };
     }
+    return {};
+  };
 
-    // Sales person pages
+  const pages = getPageConfigurations();
+
+  // ✅ ENHANCED: Set default page based on user type
+  React.useEffect(() => {
+    if (isSalesPerson() && currentPage === 'dashboard') {
+      setCurrentPage('sales-dashboard');
+    } else if (isAdmin() && currentPage === 'sales-dashboard') {
+      setCurrentPage('dashboard');
+    }
+  }, [userType, isAdmin, isSalesPerson, currentPage]);
+
+  // ✅ ENHANCED: Fallback handling
+  const getCurrentPageConfig = () => {
+    const pageConfig = pages[currentPage];
+    
+    if (pageConfig) {
+      return pageConfig;
+    }
+    
+    // Fallback to appropriate default based on user type
     if (isSalesPerson()) {
-      switch (currentPage) {
-        case 'sales-dashboard':
-          return <SalesDashboard />;
-        case 'my-users':
-          return <MyUsers />;
-        case 'my-commissions':
-          return <MyCommissions />;
-        case 'my-performance':
-          return <MyPerformance />;
-        case 'register-user':
-          return <RegisterUser />;
-        case 'sales-profile':
-          return <SalesProfile />;
-        default:
-          return <SalesDashboard />;
-      }
+      return pages['sales-dashboard'] || { title: 'Dashboard', component: SalesDashboard };
+    } else if (isAdmin()) {
+      return pages['dashboard'] || { title: 'Dashboard', component: Dashboard };
     }
-
-    // Fallback
-    return <div className="p-6">Page non trouvée</div>;
-  };
-
-  // ✅ NEW: Get page title based on current page
-  const getPageTitle = () => {
-    const titles = {
-      // Common pages
-      'organization': 'Organigramme',
-      
-      // Admin pages
-      'dashboard': 'Tableau de bord',
-      'sales-people': 'Commerciaux',
-      'commissions': 'Commissions',
-      'analytics': 'Analyses',
-      'users': 'Utilisateurs',
-      'permissions': 'Permissions',
-      'admin-management': 'Gestion des Administrateurs',
-      'settings': 'Paramètres',
-      
-      // Sales person pages
-      'sales-dashboard': 'Mon Tableau de bord',
-      'my-users': 'Mes Utilisateurs',
-      'my-commissions': 'Mes Commissions',
-      'my-performance': 'Ma Performance',
-      'register-user': 'Inscrire Utilisateur',
-      'sales-profile': 'Mon Profil'
+    
+    // Ultimate fallback
+    return { 
+      title: 'Page non trouvée', 
+      component: () => (
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">Page non trouvée</h2>
+            <p className="text-gray-600">Cette page n'existe pas ou vous n'y avez pas accès.</p>
+          </div>
+        </div>
+      )
     };
-
-    return titles[currentPage] || 'Dashboard';
   };
 
-  // ✅ NEW: Check if current page is new feature
-  const isNewFeature = () => {
-    return currentPage === 'organization';
-  };
+  const currentPageConfig = getCurrentPageConfig();
+  const PageComponent = currentPageConfig.component;
 
   return (
-    <div className={`min-h-screen transition-colors duration-200 ${
-      darkMode 
-        ? 'bg-gray-900 text-white' 
-        : 'bg-gray-50 text-gray-900'
-    }`}>
-      
+    <div className="min-h-screen bg-gray-50">
       {/* Sidebar */}
       <Sidebar 
         currentPage={currentPage}
@@ -134,41 +141,30 @@ const MainLayout = () => {
         isSidebarOpen={isSidebarOpen}
         setIsSidebarOpen={setIsSidebarOpen}
       />
-
-      {/* Main Content */}
-      <div className="lg:ml-64 flex flex-col min-h-screen">
-        
+      
+      {/* Contenu principal */}
+      <div className="lg:ml-64">
         {/* Header */}
         <Header 
-          onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          currentPageTitle={getPageTitle()}
-          isNewFeature={isNewFeature()}
+          title={currentPageConfig.title}
+          isSidebarOpen={isSidebarOpen}
+          setIsSidebarOpen={setIsSidebarOpen}
         />
-
-        {/* Page Content */}
-        <main className="flex-1 p-6 overflow-auto">
-          <div className="max-w-7xl mx-auto">
-            
-            {/* ✅ NEW: New feature announcement for organization chart */}
-            {isNewFeature() && (
-              <div className="mb-6 bg-gradient-to-r from-blue-50 to-green-50 dark:from-blue-900/20 dark:to-green-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                <div className="flex items-center space-x-2">
-                  <span className="bg-green-500 text-white text-xs px-2 py-1 rounded-full font-medium">
-                    NOUVEAU
-                  </span>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    Organigramme Interactif
-                  </h3>
+        
+        {/* Contenu de la page */}
+        <main className="p-6">
+          <React.Suspense 
+            fallback={
+              <div className="flex items-center justify-center h-64">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                  <p className="text-gray-600">Chargement...</p>
                 </div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-                  Découvrez la nouvelle vue hiérarchique avec gestion des promotions et rétrogradations en temps réel.
-                </p>
               </div>
-            )}
-
-            {/* Render current page */}
-            {renderCurrentPage()}
-          </div>
+            }
+          >
+            <PageComponent />
+          </React.Suspense>
         </main>
       </div>
     </div>
