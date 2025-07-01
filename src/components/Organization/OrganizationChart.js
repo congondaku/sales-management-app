@@ -28,6 +28,42 @@ import PromoteSalesPersonModal from './PromoteSalesPersonModal';
 import PromoteAdminModal from './PromoteAdminModal';
 import DemoteAdminModal from './DemoteAdminModal';
 
+// Utility functions - defined outside components to be accessible everywhere
+const getRoleIcon = (role) => {
+  switch (role) {
+    case 'ceo':
+      return <Crown className="w-4 h-4 text-yellow-500" />;
+    case 'regional_manager':
+    case 'sales_manager':
+      return <Shield className="w-4 h-4 text-blue-500" />;
+    case 'team_leader':
+      return <Target className="w-4 h-4 text-green-500" />;
+    case 'Sales Person':
+      return <User className="w-4 h-4 text-purple-500" />;
+    default:
+      return <User className="w-4 h-4 text-gray-500" />;
+  }
+};
+
+const getRoleColor = (role) => {
+  switch (role?.toLowerCase()) {
+    case 'ceo':
+      return 'bg-yellow-100 border-yellow-300 text-yellow-800 dark:bg-yellow-900/20 dark:border-yellow-700 dark:text-yellow-200';
+    case 'regional_manager':
+      return 'bg-blue-100 border-blue-300 text-blue-800 dark:bg-blue-900/20 dark:border-blue-700 dark:text-blue-200';
+    case 'sales_manager':
+      return 'bg-indigo-100 border-indigo-300 text-indigo-800 dark:bg-indigo-900/20 dark:border-indigo-700 dark:text-indigo-200';
+    case 'team_leader':
+      return 'bg-green-100 border-green-300 text-green-800 dark:bg-green-900/20 dark:border-green-700 dark:text-green-200';
+    case 'sales person':
+      return 'bg-purple-100 border-purple-300 text-purple-800 dark:bg-purple-900/20 dark:border-purple-700 dark:text-purple-200';
+    case 'admin':
+      return 'bg-gray-100 border-gray-300 text-gray-800 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200';
+    default:
+      return 'bg-gray-100 border-gray-300 text-gray-800 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200';
+  }
+};
+
 const OrganizationChart = () => {
   const { user } = useAuth();
   const [hierarchy, setHierarchy] = useState([]);
@@ -123,27 +159,6 @@ const OrganizationChart = () => {
     setShowPromoteAdminModal(false);
     setShowDemoteModal(false);
     setSelectedPerson(null);
-  };
-
-  const getRoleIcon = (role) => {
-    switch (role) {
-      case 'ceo':
-        return <Crown className="w-4 h-4 text-yellow-500" />;
-      case 'regional_manager':
-      case 'sales_manager':
-        return <Shield className="w-4 h-4 text-blue-500" />;
-      case 'team_leader':
-        return <Target className="w-4 h-4 text-green-500" />;
-      case 'Sales Person':
-        return <User className="w-4 h-4 text-purple-500" />;
-      default:
-        return <User className="w-4 h-4 text-gray-500" />;
-    }
-  };
-
-  const getRoleColor = (role) => {
-    const colors = promotionService.getRoleColor(role);
-    return colors;
   };
 
   const getPromotionActions = (person) => {
@@ -602,7 +617,6 @@ const OrganizationChart = () => {
 // Person Details Modal Component
 const PersonDetailsModal = ({ person, onClose, onPromote, onDemote }) => {
   const { user } = useAuth();
-  const promotionActions = getPromotionActions(person);
 
   const getPromotionActions = (person) => {
     const actions = [];
@@ -651,7 +665,7 @@ const PersonDetailsModal = ({ person, onClose, onPromote, onDemote }) => {
             </div>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-2xl"
             >
               ×
             </button>
