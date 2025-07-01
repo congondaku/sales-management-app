@@ -3,12 +3,13 @@ import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import MainLayout from './components/Layout/MainLayout';
-// ✅ NEW: Import sales person layout if you create one
-// import SalesPersonLayout from './components/Layout/SalesPersonLayout';
 import LoginForm from './components/Auth/LoginForm';
 import { useAuth } from './hooks/useAuth';
 import LoadingSpinner, { PageSpinner } from './components/Commons/LoadingSpinner';
 import { ToastContainer, useToast } from './components/Commons/Toast';
+
+// ✅ NEW: Import organization components
+import OrganizationChart from './components/Organization/OrganizationChart';
 
 // Composant principal de l'application
 const AppContent = () => {
@@ -19,14 +20,13 @@ const AppContent = () => {
     return <PageSpinner text="Chargement de l'application..." />;
   }
 
-  // ✅ NEW: Route based on user type
+  // ✅ NEW: Route based on user type with organization chart
   const renderDashboard = () => {
     if (isAdmin()) {
-      // Admin gets full MainLayout with all features
+      // Admin gets full MainLayout with all features including organization chart
       return <MainLayout />;
     } else if (isSalesPerson()) {
-      // Sales person gets simplified layout
-      // For now, use MainLayout but you could create SalesPersonLayout
+      // Sales person gets simplified layout but can still see organization chart
       return <MainLayout />;
     }
     return <LoginForm />;

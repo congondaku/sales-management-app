@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { 
-  Home, 
-  Users, 
-  DollarSign, 
-  BarChart3, 
-  User, 
-  Shield, 
-  Settings, 
+import {
+  Home,
+  Users,
+  DollarSign,
+  BarChart3,
+  User,
+  Shield,
+  Settings,
   LogOut,
   X,
   TrendingUp,
@@ -18,7 +18,8 @@ import {
   UserPlus,
   Target,
   FileText,
-  Calendar
+  Calendar,
+  Network  // Use Network instead of Sitemap
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { hasPermission } from '../../utils/permissions';
@@ -31,99 +32,113 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
   // ✅ ENHANCED: Different menu items based on user type
   const getMenuItems = () => {
     if (isAdmin()) {
-      // Admin menu items (original)
+      // Admin menu items (enhanced with Organization Chart)
       return [
-        { 
-          id: 'dashboard', 
-          label: 'Tableau de bord', 
+        {
+          id: 'dashboard',
+          label: 'Tableau de bord',
           icon: Home,
           permission: null,
           description: 'Vue d\'ensemble des performances'
         },
-        { 
-          id: 'sales-people', 
-          label: 'Commerciaux', 
+        {
+          id: 'organization',
+          label: 'Organigramme',
+          icon: Network,
+          permission: null,
+          description: 'Structure hiérarchique et promotions'
+        },
+        {
+          id: 'sales-people',
+          label: 'Commerciaux',
           icon: Users,
           permission: 'canViewAllSalesPeople',
           description: 'Gestion de l\'équipe de vente'
         },
-        { 
-          id: 'commissions', 
-          label: 'Commissions', 
+        {
+          id: 'commissions',
+          label: 'Commissions',
           icon: DollarSign,
           permission: 'canViewCommissions',
           description: 'Suivi des commissions et paiements'
         },
-        { 
-          id: 'analytics', 
-          label: 'Analyses', 
+        {
+          id: 'analytics',
+          label: 'Analyses',
           icon: BarChart3,
           permission: 'canViewAnalytics',
           description: 'Rapports et statistiques détaillées'
         },
-        { 
-          id: 'users', 
-          label: 'Utilisateurs', 
+        {
+          id: 'users',
+          label: 'Utilisateurs',
           icon: User,
           permission: 'canViewAllData',
           description: 'Gestion des comptes utilisateurs'
         },
-        { 
-          id: 'permissions', 
-          label: 'Permissions', 
+        {
+          id: 'permissions',
+          label: 'Permissions',
           icon: Shield,
           permission: 'canManagePermissions',
           description: 'Configuration des accès et rôles'
         },
-        { 
-          id: 'settings', 
-          label: 'Paramètres', 
+        {
+          id: 'settings',
+          label: 'Paramètres',
           icon: Settings,
           permission: null,
           description: 'Configuration du compte'
         }
       ];
     } else if (isSalesPerson()) {
-      // Sales person menu items (simplified)
+      // Sales person menu items (simplified but with org chart access)
       return [
-        { 
-          id: 'sales-dashboard', 
-          label: 'Mon Tableau de bord', 
+        {
+          id: 'sales-dashboard',
+          label: 'Mon Tableau de bord',
           icon: Home,
           permission: null,
           description: 'Vue d\'ensemble de mes performances'
         },
-        { 
-          id: 'my-users', 
-          label: 'Mes Utilisateurs', 
-          icon: UserPlus,
-          permission: null,
-          description: 'Utilisateurs que j\'ai enregistrés'
-        },
-        { 
-          id: 'my-commissions', 
-          label: 'Mes Commissions', 
-          icon: DollarSign,
-          permission: null,
-          description: 'Mes commissions et gains'
-        },
-        { 
-          id: 'my-performance', 
-          label: 'Ma Performance', 
-          icon: Target,
-          permission: null,
-          description: 'Objectifs et résultats'
-        },
-        { 
-          id: 'register-user', 
-          label: 'Inscrire Utilisateur', 
+        {
+          id: 'register-user',
+          label: 'Inscrire Utilisateur',
           icon: UserPlus,
           permission: null,
           description: 'Enregistrer un nouveau client'
         },
-        { 
-          id: 'sales-profile', 
-          label: 'Mon Profil', 
+        {
+          id: 'organization',
+          label: 'Organigramme',
+          icon: Network,
+          permission: null,
+          description: 'Structure de l\'organisation'
+        },
+        {
+          id: 'my-users',
+          label: 'Mes Utilisateurs',
+          icon: UserPlus,
+          permission: null,
+          description: 'Utilisateurs que j\'ai enregistrés'
+        },
+        // {
+        //   id: 'my-commissions',
+        //   label: 'Mes Commissions',
+        //   icon: DollarSign,
+        //   permission: null,
+        //   description: 'Mes commissions et gains'
+        // },
+        {
+          id: 'my-performance',
+          label: 'Ma Performance',
+          icon: Target,
+          permission: null,
+          description: 'Objectifs et résultats'
+        },
+        {
+          id: 'sales-profile',
+          label: 'Mon Profil',
           icon: User,
           permission: null,
           description: 'Paramètres de mon compte'
@@ -138,14 +153,14 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
   // ✅ ENHANCED: Permission checking based on user type
   const checkPermission = (item) => {
     if (!item.permission) return true;
-    
+
     if (isAdmin()) {
       return hasPermission(user, item.permission);
     } else if (isSalesPerson()) {
       // Sales people have access to all their menu items
       return true;
     }
-    
+
     return false;
   };
 
@@ -179,11 +194,12 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
   // ✅ ENHANCED: User role display
   const getRoleDisplay = () => {
     if (isAdmin()) {
-      return user?.role === 'ceo' ? 'PDG' : 
-             user?.role === 'admin' ? 'Administrateur' :
-             user?.role === 'regional_manager' ? 'Directeur Régional' :
-             user?.role === 'sales_manager' ? 'Directeur des Ventes' :
-             user?.role || 'Utilisateur';
+      return user?.role === 'ceo' ? 'PDG' :
+        user?.role === 'admin' ? 'Administrateur' :
+          user?.role === 'regional_manager' ? 'Directeur Régional' :
+            user?.role === 'sales_manager' ? 'Directeur des Ventes' :
+              user?.role === 'team_leader' ? 'Chef d\'Équipe' :
+                user?.role || 'Utilisateur';
     } else if (isSalesPerson()) {
       return 'Commercial';
     }
@@ -211,11 +227,16 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
 
   const headerInfo = getHeaderInfo();
 
+  // ✅ NEW: Highlight organization chart as new feature
+  const isNewFeature = (itemId) => {
+    return itemId === 'organization';
+  };
+
   return (
     <>
       {/* Overlay pour mobile */}
       {isSidebarOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
           onClick={() => setIsSidebarOpen(false)}
         />
@@ -226,7 +247,7 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
         fixed top-0 left-0 h-full w-64 bg-gray-900 text-white transform transition-transform duration-300 ease-in-out z-50 flex flex-col
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0
       `}>
-        
+
         {/* ✅ ENHANCED: Header with user type indication */}
         <div className="p-6 border-b border-gray-700 flex-shrink-0">
           <div className="flex items-center justify-between">
@@ -290,7 +311,7 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
           </div>
           <div className="flex items-center space-x-2">
             <div className="flex-1 bg-gray-700 rounded-full h-2">
-              <div 
+              <div
                 className={`${isSalesPerson() ? 'bg-green-500' : 'bg-green-500'} h-2 rounded-full transition-all duration-300`}
                 style={{ width: `${permissionStats.total > 0 ? (permissionStats.granted / permissionStats.total) * 100 : 0}%` }}
               ></div>
@@ -346,7 +367,8 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
               {visibleMenuItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = currentPage === item.id;
-                
+                const isNew = isNewFeature(item.id);
+
                 return (
                   <li key={item.id}>
                     <button
@@ -355,8 +377,8 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
                         setIsSidebarOpen(false);
                       }}
                       className={`
-                        w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors text-left group
-                        ${isActive 
+                        w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors text-left group relative
+                        ${isActive
                           ? (isSalesPerson() ? 'bg-green-600 text-white' : 'bg-blue-600 text-white')
                           : 'text-gray-300 hover:bg-gray-800 hover:text-white'
                         }
@@ -375,6 +397,12 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
                       {!item.permission && (
                         <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
                       )}
+                      {/* NEW: Badge for new features */}
+                      {isNew && (
+                        <span className="absolute -top-1 -right-1 bg-green-500 text-white text-xs px-1.5 py-0.5 rounded-full font-medium">
+                          NEW
+                        </span>
+                      )}
                     </button>
                   </li>
                 );
@@ -391,7 +419,7 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
               <ul className="space-y-2">
                 {hiddenMenuItems.map((item) => {
                   const Icon = item.icon;
-                  
+
                   return (
                     <li key={item.id}>
                       <div

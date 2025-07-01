@@ -6,16 +6,16 @@ import {
   Award, 
   Calendar,
   Users,
-  DollarSign,
   CheckCircle,
   AlertTriangle,
   BarChart3,
-  Clock
+  Clock,
+  UserCheck
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { salesPersonAuthService } from '../../services/sales-person-auth.service';
 import LoadingSpinner, { SectionSpinner } from '../Commons/LoadingSpinner';
-import { formatCurrency, formatNumber } from '../../utils/helpers';
+import { formatNumber } from '../../utils/helpers';
 import StatCard from '../Dashboard/StatCard';
 
 const MyPerformance = () => {
@@ -137,7 +137,7 @@ const MyPerformance = () => {
       </div>
 
       {/* Overall Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <StatCard
           title="Total Inscriptions"
           value={formatNumber(user?.totalRegistrations || 0, 0)}
@@ -151,13 +151,6 @@ const MyPerformance = () => {
           icon={CheckCircle}
           color="green"
           subtitle="Ayant effectué un paiement"
-        />
-        <StatCard
-          title="Total Gains"
-          value={formatCurrency(user?.totalEarnings || 0)}
-          icon={DollarSign}
-          color="yellow"
-          subtitle="Commissions totales"
         />
         <StatCard
           title="Taux de Conversion"
@@ -226,41 +219,28 @@ const MyPerformance = () => {
                   </div>
                 </div>
 
-                {/* Earnings */}
+                {/* Conversions */}
                 <div>
                   <div className="flex items-center justify-between mb-4">
-                    <h4 className="font-medium text-gray-700 dark:text-gray-300">Gains</h4>
-                    {getAchievementIcon(performance.weekly.earningsAchievementPercentage)}
+                    <h4 className="font-medium text-gray-700 dark:text-gray-300">Conversions</h4>
+                    <UserCheck className="h-5 w-5 text-green-600" />
                   </div>
                   
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-2xl font-bold text-green-600">
-                        {formatCurrency(performance.weekly.earnings)}
+                        {performance.weekly.paidRegistrations || 0}
                       </span>
-                      {performance.weekly.earningsTarget > 0 && (
-                        <span className="text-sm text-gray-500 dark:text-gray-400">
-                          / {formatCurrency(performance.weekly.earningsTarget)}
-                        </span>
-                      )}
+                      <span className="text-sm text-gray-500 dark:text-gray-400">
+                        clients payants
+                      </span>
                     </div>
                     
-                    {performance.weekly.earningsTarget > 0 && (
-                      <>
-                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
-                          <div 
-                            className={`h-3 rounded-full transition-all duration-500 ${getProgressBarColor(performance.weekly.earningsAchievementPercentage)}`}
-                            style={{ width: `${Math.min(performance.weekly.earningsAchievementPercentage, 100)}%` }}
-                          ></div>
-                        </div>
-                        
-                        <div className="flex items-center justify-between text-sm">
-                          <span className={`font-medium ${getAchievementColor(performance.weekly.earningsAchievementPercentage)}`}>
-                            {performance.weekly.earningsAchievementPercentage}% de l'objectif
-                          </span>
-                        </div>
-                      </>
-                    )}
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                      Taux: {performance.weekly.registrations > 0 
+                        ? Math.round(((performance.weekly.paidRegistrations || 0) / performance.weekly.registrations) * 100)
+                        : 0}%
+                    </div>
                   </div>
                 </div>
               </div>
@@ -340,41 +320,28 @@ const MyPerformance = () => {
                   </div>
                 </div>
 
-                {/* Earnings */}
+                {/* Conversions */}
                 <div>
                   <div className="flex items-center justify-between mb-4">
-                    <h4 className="font-medium text-gray-700 dark:text-gray-300">Gains</h4>
-                    {getAchievementIcon(performance.monthly.earningsAchievementPercentage)}
+                    <h4 className="font-medium text-gray-700 dark:text-gray-300">Conversions</h4>
+                    <UserCheck className="h-5 w-5 text-green-600" />
                   </div>
                   
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-2xl font-bold text-green-600">
-                        {formatCurrency(performance.monthly.earnings)}
+                        {performance.monthly.paidRegistrations || 0}
                       </span>
-                      {performance.monthly.earningsTarget > 0 && (
-                        <span className="text-sm text-gray-500 dark:text-gray-400">
-                          / {formatCurrency(performance.monthly.earningsTarget)}
-                        </span>
-                      )}
+                      <span className="text-sm text-gray-500 dark:text-gray-400">
+                        clients payants
+                      </span>
                     </div>
                     
-                    {performance.monthly.earningsTarget > 0 && (
-                      <>
-                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
-                          <div 
-                            className={`h-3 rounded-full transition-all duration-500 ${getProgressBarColor(performance.monthly.earningsAchievementPercentage)}`}
-                            style={{ width: `${Math.min(performance.monthly.earningsAchievementPercentage, 100)}%` }}
-                          ></div>
-                        </div>
-                        
-                        <div className="flex items-center justify-between text-sm">
-                          <span className={`font-medium ${getAchievementColor(performance.monthly.earningsAchievementPercentage)}`}>
-                            {performance.monthly.earningsAchievementPercentage}% de l'objectif
-                          </span>
-                        </div>
-                      </>
-                    )}
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                      Taux: {performance.monthly.registrations > 0 
+                        ? Math.round(((performance.monthly.paidRegistrations || 0) / performance.monthly.registrations) * 100)
+                        : 0}%
+                    </div>
                   </div>
                 </div>
               </div>
@@ -471,13 +438,13 @@ const MyPerformance = () => {
           
           <div className="text-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
             <div className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
-              {formatCurrency(user?.totalEarnings || 0)}
+              {user?.totalPaidRegistrations || 0}
             </div>
             <div className="text-sm text-gray-600 dark:text-gray-400">
-              Total Gains
+              Total Conversions
             </div>
             <div className="text-xs text-green-600 mt-1">
-              Commissions cumulées
+              Clients payants
             </div>
           </div>
           
@@ -517,8 +484,12 @@ const MyPerformance = () => {
             </div>
             <div className="w-px h-8 bg-purple-300"></div>
             <div className="text-center">
-              <div className="font-bold text-lg">{formatCurrency(user?.totalEarnings || 0)}</div>
-              <div className="text-purple-200">Gains</div>
+              <div className="font-bold text-lg">
+                {user?.totalRegistrations > 0 
+                  ? Math.round((user.totalPaidRegistrations / user.totalRegistrations) * 100)
+                  : 0}%
+              </div>
+              <div className="text-purple-200">Taux Succès</div>
             </div>
           </div>
         </div>

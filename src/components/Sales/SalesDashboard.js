@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Users, 
-  DollarSign, 
   Target, 
   TrendingUp, 
   UserCheck,
@@ -13,7 +12,7 @@ import { salesPersonAuthService } from '../../services/sales-person-auth.service
 import { apiHelpers } from '../../services/api';
 import StatCard from '../Dashboard/StatCard';
 import LoadingSpinner, { SectionSpinner } from '../Commons/LoadingSpinner';
-import { formatCurrency, formatNumber } from '../../utils/helpers';
+import { formatNumber } from '../../utils/helpers';
 
 const SalesDashboard = () => {
   const { user } = useAuth();
@@ -93,7 +92,7 @@ const SalesDashboard = () => {
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <StatCard
           title="Mes Inscriptions"
           value={formatNumber(dashboardData?.stats?.totalRegistrations || 0, 0)}
@@ -107,13 +106,6 @@ const SalesDashboard = () => {
           icon={UserCheck}
           color="green"
           subtitle="Ayant effectué un paiement"
-        />
-        <StatCard
-          title="Mes Gains Totaux"
-          value={formatCurrency(dashboardData?.stats?.totalEarnings || 0)}
-          icon={DollarSign}
-          color="yellow"
-          subtitle="Commissions gagnées"
         />
         <StatCard
           title="Performance"
@@ -148,13 +140,6 @@ const SalesDashboard = () => {
                     </span>
                   )}
                 </div>
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600 dark:text-gray-400">Gains</span>
-                <span className="text-lg font-semibold text-gray-900 dark:text-white">
-                  {formatCurrency(dashboardData.performance.weekly?.earnings || 0)}
-                </span>
               </div>
               
               {/* Progress Bar */}
@@ -197,13 +182,6 @@ const SalesDashboard = () => {
                     </span>
                   )}
                 </div>
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600 dark:text-gray-400">Gains</span>
-                <span className="text-lg font-semibold text-gray-900 dark:text-white">
-                  {formatCurrency(dashboardData.performance.monthly?.earnings || 0)}
-                </span>
               </div>
               
               {/* Progress Bar */}
@@ -263,11 +241,9 @@ const SalesDashboard = () => {
                           Payant
                         </span>
                       )}
-                      {user.hasCommission && (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                          Commission
-                        </span>
-                      )}
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        Inscrit
+                      </span>
                     </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                       {new Date(user.createdAt).toLocaleDateString('fr-FR')}
@@ -285,11 +261,11 @@ const SalesDashboard = () => {
           </div>
         )}
 
-        {/* Recent Commissions */}
+        {/* Recent Achievements */}
         {dashboardData?.recentCommissions && dashboardData.recentCommissions.length > 0 && (
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Commissions Récentes
+              Réussites Récentes
             </h3>
             
             <div className="space-y-4">
@@ -305,11 +281,11 @@ const SalesDashboard = () => {
                   </div>
                   <div className="text-right">
                     <p className="font-semibold text-green-600">
-                      {formatCurrency(commission.commissionAmount)}
+                      ✓ Réussite
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-400">
                       {commission.status === 'confirmed' ? 'Confirmée' : 
-                       commission.status === 'paid_out' ? 'Payée' : 'En attente'}
+                       commission.status === 'paid_out' ? 'Validée' : 'En attente'}
                     </p>
                   </div>
                 </div>
@@ -318,7 +294,7 @@ const SalesDashboard = () => {
             
             <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
               <button className="w-full text-sm text-green-600 hover:text-green-800 dark:text-green-400 font-medium">
-                Voir toutes mes commissions →
+                Voir toutes mes réussites →
               </button>
             </div>
           </div>
@@ -340,7 +316,7 @@ const SalesDashboard = () => {
                 Graphique des performances
               </p>
               <p className="text-sm text-gray-400 mt-2">
-                Total sur la période: {dashboardData.performanceTrend.reduce((sum, day) => sum + (day.commissions || 0), 0)} commissions
+                Total sur la période: {dashboardData.performanceTrend.reduce((sum, day) => sum + (day.registrations || 0), 0)} inscriptions
               </p>
             </div>
           </div>
@@ -348,7 +324,7 @@ const SalesDashboard = () => {
       )}
 
       {/* Quick Actions */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+      {/* <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
           Actions Rapides
         </h3>
@@ -393,7 +369,7 @@ const SalesDashboard = () => {
             </p>
           </button>
         </div>
-      </div>
+      </div> */}
 
       {/* Manager Info */}
       {user?.manager && (

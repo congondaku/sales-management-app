@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Filter, Eye, Edit, UserX, UserCheck, Shield, Users, Crown, Trash2 } from 'lucide-react';
+import { Plus, Search, Filter, Eye, Edit, UserX, UserCheck, Shield, Users, Crown, Trash2, TrendingUp, TrendingDown } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { authService } from '../../services/auth.service';
+import { promotionService } from '../../services/promotion.service'; // NEW
 import { hasPermission } from '../../utils/permissions';
 import { formatFullName, formatUserRole } from '../../utils/formatters';
 import { ROLE_LABELS } from '../../utils/constants';
@@ -12,6 +13,10 @@ import EditAdminModal from './EditAdminModal';
 import AdminDetailsModal from './AdminDetailsModal';
 import { SectionSpinner } from '../Commons/LoadingSpinner';
 import { useConfirmDialog } from '../Commons/ConfirmDialog';
+
+// ✅ NEW: Import promotion modals
+import PromoteAdminModal from '../Organization/PromoteAdminModal';
+import DemoteAdminModal from '../Organization/DemoteAdminModal';
 
 const AdminManagementPage = () => {
   const { user } = useAuth();
@@ -31,6 +36,10 @@ const AdminManagementPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [hierarchy, setHierarchy] = useState(null);
+
+  // ✅ NEW: Promotion modal states
+  const [showPromoteModal, setShowPromoteModal] = useState(false);
+  const [showDemoteModal, setShowDemoteModal] = useState(false);
 
   const { ConfirmDialogComponent, confirmAction } = useConfirmDialog();
 
@@ -87,6 +96,43 @@ const AdminManagementPage = () => {
     setShowEditModal(false);
     setSelectedAdmin(null);
     loadAdmins();
+  };
+
+  // ✅ NEW: Promotion handlers
+  const handlePromoteAdmin = (admin) => {
+    setSelectedAdmin(admin);
+    setShowPromoteModal(true);
+  };
+
+  const handleDemoteAdmin = (admin) => {
+    setSelectedAdmin(admin);
+    setShowDemoteModal(true);
+  };
+
+  const handlePromotionSuccess = () => {
+    setShowPromoteModal(false);
+    setShowDemoteModal(false);
+    setSelectedAdmin(null);
+    loadAdmins();
+    loadHierarchy();
+  };
+
+  // ✅ NEW: Check if admin can be promoted/demoted
+  const canPromoteAdmin = (admin) => {
+    if (!hasPermission(user, 'canEditAdmins')) return false;
+    if (admin._id === user._id) return false; // Can't promote yourself
+    
+    const promotionOptions = promotionService.getPromotionOptions(admin.role, user?.role);
+    return promotionOptions.length > 0;
+  };
+
+  const canDemoteAdmin = (admin) => {
+    if (!hasPermission(user, 'canEditAdmins')) return false;
+    if (admin._id === user._id) return false; // Can't demote yourself
+    if (admin.role === 'ceo') return false; // Can't demote CEO
+    
+    const demotionOptions = promotionService.getDemotionOptions(admin.role);
+    return demotionOptions.length > 0;
   };
 
   const handleViewDetails = (admin) => {
@@ -161,7 +207,7 @@ const AdminManagementPage = () => {
     setCurrentPage(1);
   };
 
-  // Configuration des colonnes du tableau
+  // ✅ ENHANCED: Configuration des colonnes du tableau avec actions de promotion
   const columns = [
     createColumn.custom('admin', 'Administrateur', (_, row) => (
       <div className="flex items-center">
@@ -275,6 +321,34 @@ const AdminManagementPage = () => {
         >
           <Eye className="h-4 w-4" />
         </button>
+
+        {/* ✅ NEW: Promotion button */}
+        {canPromoteAdmin(row) && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handlePromoteAdmin(row);
+            }}
+            className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
+            title="Promouvoir"
+          >
+            <TrendingUp className="h-4 w-4" />
+          </button>
+        )}
+
+        {/* ✅ NEW: Demotion button */}
+        {canDemoteAdmin(row) && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDemoteAdmin(row);
+            }}
+            className="p-2 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-lg transition-colors"
+            title="Rétrograder"
+          >
+            <TrendingDown className="h-4 w-4" />
+          </button>
+        )}
         
         {hasPermission(user, 'canEditAdmins') && row._id !== user._id && (
           <button
@@ -528,6 +602,29 @@ const AdminManagementPage = () => {
             setShowDetailsModal(false);
             setShowEditModal(true);
           }}
+        />
+      )}
+
+      {/* ✅ NEW: Promotion Modals */}
+      {showPromoteModal && selectedAdmin && (
+        <PromoteAdminModal
+          admin={selectedAdmin}
+          onClose={() => {
+            setShowPromoteModal(false);
+            setSelectedAdmin(null);
+          }}
+          onSuccess={handlePromotionSuccess}
+        />
+      )}
+
+      {showDemoteModal && selectedAdmin && (
+        <DemoteAdminModal
+          admin={selectedAdmin}
+          onClose={() => {
+            setShowDemoteModal(false);
+            setSelectedAdmin(null);
+          }}
+          onSuccess={handlePromotionSuccess}
         />
       )}
 

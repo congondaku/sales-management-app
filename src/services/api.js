@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // ✅ ENVIRONMENT-BASED API URL
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://evn92jcmry.us-east-1.awsapprunner.com/api';
+const API_BASE_URL = 'https://evn92jcmry.us-east-1.awsapprunner.com/api';
 const API_TIMEOUT = 15000; // Increased timeout for slow connections
 
 console.log('🔧 API Configuration:', {
