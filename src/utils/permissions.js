@@ -32,7 +32,7 @@ export const canManageUser = (currentUser, targetUser, targetType = 'SalesPerson
   return false;
 };
 
-// Obtenir les permissions par défaut selon le rôle
+// ✅ UPDATED: Obtenir les permissions par défaut selon le rôle - ALL ADMINS can manage sales people
 export const getDefaultPermissionsByRole = (role) => {
   const permissions = {};
   
@@ -50,9 +50,12 @@ export const getDefaultPermissionsByRole = (role) => {
       break;
       
     case USER_ROLES.REGIONAL_MANAGER:
+      // ✅ UPDATED: All sales people management permissions by default
       permissions[PERMISSIONS.CAN_CREATE_SALES_PEOPLE] = true;
       permissions[PERMISSIONS.CAN_EDIT_SALES_PEOPLE] = true;
+      permissions[PERMISSIONS.CAN_DELETE_SALES_PEOPLE] = true;
       permissions[PERMISSIONS.CAN_VIEW_ALL_SALES_PEOPLE] = true;
+      // Other permissions remain as before
       permissions[PERMISSIONS.CAN_VIEW_COMMISSIONS] = true;
       permissions[PERMISSIONS.CAN_PROCESS_PAYOUTS] = true;
       permissions[PERMISSIONS.CAN_VIEW_ANALYTICS] = true;
@@ -62,23 +65,35 @@ export const getDefaultPermissionsByRole = (role) => {
       break;
       
     case USER_ROLES.SALES_MANAGER:
+      // ✅ UPDATED: All sales people management permissions by default
       permissions[PERMISSIONS.CAN_CREATE_SALES_PEOPLE] = true;
       permissions[PERMISSIONS.CAN_EDIT_SALES_PEOPLE] = true;
+      permissions[PERMISSIONS.CAN_DELETE_SALES_PEOPLE] = true;
       permissions[PERMISSIONS.CAN_VIEW_ALL_SALES_PEOPLE] = true;
+      // Other permissions remain as before
       permissions[PERMISSIONS.CAN_VIEW_COMMISSIONS] = true;
       permissions[PERMISSIONS.CAN_PROCESS_PAYOUTS] = true;
       permissions[PERMISSIONS.CAN_VIEW_ANALYTICS] = true;
       break;
       
     case USER_ROLES.TEAM_LEADER:
+      // ✅ UPDATED: All sales people management permissions by default
+      permissions[PERMISSIONS.CAN_CREATE_SALES_PEOPLE] = true;
       permissions[PERMISSIONS.CAN_EDIT_SALES_PEOPLE] = true;
+      permissions[PERMISSIONS.CAN_DELETE_SALES_PEOPLE] = true;
       permissions[PERMISSIONS.CAN_VIEW_ALL_SALES_PEOPLE] = true;
+      // Other permissions remain as before
       permissions[PERMISSIONS.CAN_VIEW_COMMISSIONS] = true;
       permissions[PERMISSIONS.CAN_VIEW_ANALYTICS] = true;
       break;
       
     case USER_ROLES.ADMIN:
+      // ✅ UPDATED: All sales people management permissions by default
+      permissions[PERMISSIONS.CAN_CREATE_SALES_PEOPLE] = true;
+      permissions[PERMISSIONS.CAN_EDIT_SALES_PEOPLE] = true;
+      permissions[PERMISSIONS.CAN_DELETE_SALES_PEOPLE] = true;
       permissions[PERMISSIONS.CAN_VIEW_ALL_SALES_PEOPLE] = true;
+      // Other permissions remain as before
       permissions[PERMISSIONS.CAN_VIEW_COMMISSIONS] = true;
       permissions[PERMISSIONS.CAN_VIEW_ALL_DATA] = true;
       break;

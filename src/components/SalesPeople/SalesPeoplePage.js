@@ -19,14 +19,13 @@ import { useConfirmDialog } from '../Commons/ConfirmDialog';
 
 const SalesPeoplePage = () => {
   const { token, user } = useAuth();
-  const [salesPeople, setSalesPeople] = useState([]); // Initialize as empty array
+  const [salesPeople, setSalesPeople] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState({
-    active: '',
     territory: '',
-    team: '',
-    status: 'all' // all, active, suspended, inactive
+    team: ''
+    // ✅ REMOVED: status filter - just show all their people
   });
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -44,7 +43,6 @@ const SalesPeoplePage = () => {
 
   const { ConfirmDialogComponent, confirmDelete, confirmAction } = useConfirmDialog();
 
-  // Calculate pagination manually to avoid usePagination hook issues
   const goToPage = (page) => {
     setCurrentPage(page);
   };
@@ -71,36 +69,40 @@ const SalesPeoplePage = () => {
         ...filters
       };
 
+      console.log(`🔍 Loading sales people for ${user?.role} ${user?.email}...`);
       const response = await salesService.getSalesPeople(params);
 
       if (response.success) {
-        // Ensure we always set an array
         setSalesPeople(Array.isArray(response.salesPeople) ? response.salesPeople : []);
         setTotalCount(response.pagination?.total || 0);
+        
+        console.log(`📊 Loaded ${response.salesPeople?.length || 0} sales people`, {
+          adminRole: user?.role,
+          adminEmail: user?.email,
+          canSeeAll: response.adminInfo?.canSeeAll
+        });
       } else {
         console.error('Erreur:', response.message);
-        setSalesPeople([]); // Set empty array on error
+        setSalesPeople([]);
         setError(response.message || 'Erreur lors du chargement des commerciaux');
       }
     } catch (error) {
       console.error('Erreur lors du chargement des commerciaux:', error);
-      setSalesPeople([]); // Set empty array on error
+      setSalesPeople([]);
       setError(apiHelpers.formatError(error));
     } finally {
       setLoading(false);
     }
   };
 
-  // ✅ FIXED: Use available analytics service
   const loadPerformanceStats = async () => {
     try {
       if (!hasPermission(user, 'canViewAnalytics')) {
-        return; // Skip if user doesn't have permission
+        return;
       }
 
       const response = await analyticsService.getSalesPerformance({ period: 'month' });
       if (response.success) {
-        // Calculate stats from the analytics data
         const stats = {
           totalActive: response.analytics?.salesPeople?.filter(sp => sp.salesPerson?.isActive).length || 0,
           avgPerformance: response.analytics?.summary?.averageTargetAchievement || 0,
@@ -111,7 +113,6 @@ const SalesPeoplePage = () => {
       }
     } catch (error) {
       console.error('Erreur lors du chargement des statistiques:', error);
-      // Don't show error for stats, just log it
     }
   };
 
@@ -159,7 +160,6 @@ const SalesPeoplePage = () => {
     setShowTargetsModal(true);
   };
 
-  // ✅ FIXED: Use permission service methods
   const handleSuspend = async (salesperson) => {
     const reason = prompt('Raison de la suspension:') || 'Suspendu par l\'administrateur';
     const confirmed = await confirmAction(
@@ -220,13 +220,11 @@ const SalesPeoplePage = () => {
     );
   };
 
-  // ✅ NEW: Export functionality
   const handleExport = async (format = 'csv') => {
     try {
       setExporting(true);
       const exportData = await salesService.exportSalesPeople(filters, format);
       
-      // Create and trigger download
       const blob = new Blob([exportData.content], { type: exportData.mimeType });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -244,7 +242,6 @@ const SalesPeoplePage = () => {
     }
   };
 
-  // ✅ NEW: Batch operations
   const handleBatchSuspend = async () => {
     if (selectedRows.length === 0) {
       alert('Veuillez sélectionner des commerciaux à suspendre');
@@ -305,30 +302,12 @@ const SalesPeoplePage = () => {
 
   const clearFilters = () => {
     setSearchTerm('');
-    setFilters({ active: '', territory: '', team: '', status: 'all' });
+    setFilters({ territory: '', team: '' }); // ✅ SIMPLIFIED: Just territory and team
     goToPage(1);
   };
 
-  // ✅ NEW: Advanced search
-  const handleAdvancedSearch = async (searchParams) => {
-    try {
-      setLoading(true);
-      const response = await salesService.searchSalesPeople(searchParams);
-      if (response.success) {
-        setSalesPeople(response.salesPeople || []);
-        setTotalCount(response.pagination?.total || 0);
-      }
-    } catch (error) {
-      console.error('Erreur lors de la recherche avancée:', error);
-      setError(apiHelpers.formatError(error));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Configuration des colonnes du tableau avec sélection
+  // Configuration des colonnes du tableau
   const columns = [
-    // ✅ NEW: Selection column for batch operations
     createColumn.selection({
       selectedRows,
       onSelectionChange: setSelectedRows,
@@ -409,17 +388,13 @@ const SalesPeoplePage = () => {
 
     createColumn.custom('commission', 'Commission', (_, row) => (
       <div>
-        {/* Hide commission rates if user doesn't have permission */}
         {hasPermission(user, 'canSeeCommissionRates') ? (
           <div>
             <div className="text-sm text-gray-900 dark:text-white">
               {row.commissionRate ? `${(row.commissionRate * 100).toFixed(1)}%` : 'Non défini'}
             </div>
             <div className="text-xs text-gray-500 dark:text-gray-400">
-              Dernier paiement: {row.lastCommissionDate ?
-                new Date(row.lastCommissionDate).toLocaleDateString('fr-FR') :
-                'Aucun'
-              }
+              Total: ${row.totalEarnings?.toFixed(2) || '0.00'}
             </div>
           </div>
         ) : (
@@ -428,15 +403,29 @@ const SalesPeoplePage = () => {
       </div>
     )),
 
-    createColumn.badge('isActive', 'Statut', {
-      badgeConfig: {
-        true: 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400',
-        false: 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
-      },
-      formatValue: (value, row) => {
-        if (row.isSuspended) return 'Suspendu';
-        return value ? 'Actif' : 'Inactif';
+    // ✅ UPDATED: Status column now shows comprehensive status
+    createColumn.custom('status', 'Statut', (_, row) => {
+      if (row.isSuspended) {
+        return (
+          <span className="px-2 py-1 text-xs bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400 rounded-full">
+            Suspendu
+          </span>
+        );
       }
+      
+      if (!row.isActive) {
+        return (
+          <span className="px-2 py-1 text-xs bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400 rounded-full">
+            Inactif
+          </span>
+        );
+      }
+      
+      return (
+        <span className="px-2 py-1 text-xs bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400 rounded-full">
+          Actif
+        </span>
+      );
     }),
 
     createColumn.custom('manager', 'Manager', (_, row) => (
@@ -516,19 +505,22 @@ const SalesPeoplePage = () => {
         </div>
       )}
 
-      {/* En-tête avec actions */}
+      {/* Header with role-based messaging */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
         <div>
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-            Commerciaux
+            {user?.role === 'ceo' ? 'Tous les Commerciaux' : 'Mes Commerciaux'}
           </h2>
           <p className="text-gray-600 dark:text-gray-400">
-            Gérez votre équipe de vente ({totalCount} commercial{totalCount > 1 ? 'aux' : ''})
+            {user?.role === 'ceo' 
+              ? `Gérez tous les commerciaux de l'entreprise (${totalCount} commercial${totalCount > 1 ? 'aux' : ''})`
+              : `Gérez votre équipe de vente (${totalCount} commercial${totalCount > 1 ? 'aux' : ''} sous votre gestion)`
+            }
           </p>
         </div>
 
         <div className="flex space-x-2">
-          {/* Export buttons */}
+          {/* Export buttons for CEO and authorized admins */}
           {hasPermission(user, 'canViewAllSalesPeople') && (
             <div className="flex space-x-2">
               <button
@@ -538,14 +530,6 @@ const SalesPeoplePage = () => {
               >
                 <Download className="h-4 w-4" />
                 <span>{exporting ? 'Export...' : 'CSV'}</span>
-              </button>
-              <button
-                onClick={() => handleExport('json')}
-                disabled={exporting}
-                className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 flex items-center space-x-2 disabled:opacity-50"
-              >
-                <Download className="h-4 w-4" />
-                <span>JSON</span>
               </button>
             </div>
           )}
@@ -593,7 +577,7 @@ const SalesPeoplePage = () => {
         </div>
       )}
 
-      {/* Statistiques de performance */}
+      {/* Performance stats */}
       {performanceStats && hasPermission(user, 'canViewAnalytics') && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
@@ -665,11 +649,10 @@ const SalesPeoplePage = () => {
         </div>
       )}
 
-      {/* Filtres et recherche */}
+      {/* ✅ SIMPLIFIED: Search and filters - removed status filter */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
         <div className="flex flex-col lg:flex-row space-y-4 lg:space-y-0 lg:space-x-4">
-
-          {/* Barre de recherche */}
+          {/* Search bar */}
           <div className="flex-1">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -684,19 +667,8 @@ const SalesPeoplePage = () => {
             </div>
           </div>
 
-          {/* Filtres */}
+          {/* Simple filters - only territory and team */}
           <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
-            <select
-              value={filters.status}
-              onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
-              className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-            >
-              <option value="all">Tous les statuts</option>
-              <option value="active">Actifs</option>
-              <option value="suspended">Suspendus</option>
-              <option value="inactive">Inactifs</option>
-            </select>
-
             <input
               type="text"
               placeholder="Territoire"
@@ -714,7 +686,7 @@ const SalesPeoplePage = () => {
             />
           </div>
 
-          {/* Actions de filtre */}
+          {/* Actions */}
           <div className="flex space-x-2">
             <button
               onClick={handleSearch}
@@ -742,12 +714,16 @@ const SalesPeoplePage = () => {
         </div>
       </div>
 
-      {/* Tableau des commerciaux */}
+      {/* Sales people table */}
       <Table
         data={salesPeople}
         columns={columns}
         loading={loading}
-        emptyMessage="Aucun commercial trouvé"
+        emptyMessage={
+          user?.role === 'ceo' 
+            ? "Aucun commercial trouvé dans l'entreprise" 
+            : "Vous n'avez pas encore créé de commerciaux"
+        }
         onRowClick={handleViewDetails}
         className="cursor-pointer"
         selectable={hasPermission(user, 'canEditSalesPeople')}
@@ -767,6 +743,30 @@ const SalesPeoplePage = () => {
           showItemsPerPage={true}
           showPageInfo={true}
         />
+      )}
+
+      {/* ✅ ENHANCED: Empty state for non-CEO admins */}
+      {!loading && salesPeople.length === 0 && user?.role !== 'ceo' && (
+        <div className="text-center py-12">
+          <UserPlus className="mx-auto h-12 w-12 text-gray-400" />
+          <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">
+            Aucun commercial sous votre gestion
+          </h3>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            Commencez par créer votre premier commercial pour développer votre équipe de vente.
+          </p>
+          {hasPermission(user, 'canCreateSalesPeople') && (
+            <div className="mt-6">
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                <Plus className="-ml-1 mr-2 h-5 w-5" />
+                Créer le premier commercial
+              </button>
+            </div>
+          )}
+        </div>
       )}
 
       {/* Modals */}
@@ -824,7 +824,7 @@ const SalesPeoplePage = () => {
         />
       )}
 
-      {/* Dialog de confirmation */}
+      {/* Confirmation dialog */}
       <ConfirmDialogComponent />
     </div>
   );
