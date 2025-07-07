@@ -397,12 +397,6 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
                       {!item.permission && (
                         <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
                       )}
-                      {/* NEW: Badge for new features */}
-                      {isNew && (
-                        <span className="absolute -top-1 -right-1 bg-green-500 text-white text-xs px-1.5 py-0.5 rounded-full font-medium">
-                          NEW
-                        </span>
-                      )}
                     </button>
                   </li>
                 );
