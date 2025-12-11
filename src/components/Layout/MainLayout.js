@@ -34,6 +34,10 @@ const MainLayout = () => {
           title: 'Tableau de Bord',
           component: Dashboard
         },
+        communes: {
+          title: 'Tableau de Bord',
+          component: Communes
+        },
         'sales-people': {
           title: 'Gestion des Commerciaux',
           component: SalesPeoplePage
