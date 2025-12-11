@@ -58,7 +58,7 @@ export const salesService = {
     }
   },
 
-  // ✅ NEW: Obtenir l'historique des objectifs
+  // Obtenir l'historique des objectifs
   async getTargetsHistory(id) {
     try {
       const response = await apiClient.get(`/admin/sales-people/${id}/targets-history`);
@@ -93,7 +93,7 @@ export const salesService = {
     }
   },
 
-  // ✅ NEW: Activer un commercial
+  // Activer un commercial
   async activateSalesPerson(id) {
     try {
       const response = await apiClient.put(`/admin/sales-people/${id}/activate`);
@@ -103,7 +103,7 @@ export const salesService = {
     }
   },
 
-  // ✅ NEW: Désactiver un commercial
+  // Désactiver un commercial
   async deactivateSalesPerson(id, reason = '') {
     try {
       const response = await apiClient.put(`/admin/sales-people/${id}/deactivate`, {
@@ -151,7 +151,7 @@ export const salesService = {
     }
   },
 
-  // ✅ NEW: Obtenir les analytics des ventes (alternative endpoint)
+  // Obtenir les analytics des ventes (alternative endpoint)
   async getSalesAnalyticsAlt(params = {}) {
     try {
       const response = await apiClient.get('/sales/admin/analytics', { params });
@@ -161,7 +161,7 @@ export const salesService = {
     }
   },
 
-  // ✅ NEW: Obtenir les commissions des ventes (admin view)
+  // Obtenir les commissions des ventes (admin view)
   async getSalesCommissions(params = {}) {
     try {
       const response = await apiClient.get('/sales/admin/commissions', { params });
@@ -171,7 +171,7 @@ export const salesService = {
     }
   },
 
-  // ✅ NEW: Traiter un paiement de commission
+  // Traiter un paiement de commission
   async processCommissionPayout(commissionId, payoutNotes = '') {
     try {
       const response = await apiClient.post(`/sales/admin/payout/${commissionId}`, {
@@ -187,7 +187,7 @@ export const salesService = {
   // TARGET MANAGEMENT (ENHANCED)
   // ================================
 
-  // ✅ NEW: Valider les objectifs
+  // Valider les objectifs
   validateTargets(targets) {
     const errors = {};
 
@@ -234,7 +234,7 @@ export const salesService = {
     };
   },
 
-  // ✅ NEW: Mise à jour en masse des objectifs
+  // Mise à jour en masse des objectifs
   async bulkUpdateTargets(salesPeopleIds, targets, reason = '') {
     try {
       const promises = salesPeopleIds.map(id => 
@@ -296,13 +296,13 @@ export const salesService = {
     };
   },
 
-  // ✅ NEW: Calculer le pourcentage d'atteinte des objectifs
+  // Calculer le pourcentage d'atteinte des objectifs
   calculateTargetAchievement(actual, target) {
     if (!target || target === 0) return 0;
     return Math.round((actual / target) * 100);
   },
 
-  // ✅ NEW: Formatter les statistiques de performance
+  // Formatter les statistiques de performance
   formatPerformanceStats(performance) {
     return {
       weekly: {
@@ -332,7 +332,7 @@ export const salesService = {
   // BATCH OPERATIONS (NEW)
   // ================================
 
-  // ✅ NEW: Opérations en masse sur les commerciaux
+  // Opérations en masse sur les commerciaux
   async batchToggleStatus(salesPeopleIds, isActive, reason = '') {
     try {
       const promises = salesPeopleIds.map(id => 
@@ -360,7 +360,7 @@ export const salesService = {
   // TERRITORY & TEAM MANAGEMENT (NEW)
   // ================================
 
-  // ✅ NEW: Obtenir les territoires disponibles
+  // Obtenir les territoires disponibles
   async getAvailableTerritories() {
     try {
       const response = await apiClient.get('/admin/territories');
@@ -370,7 +370,7 @@ export const salesService = {
     }
   },
 
-  // ✅ NEW: Obtenir les commerciaux par territoire
+  // Obtenir les commerciaux par territoire
   async getSalesPeopleByTerritory(territory) {
     try {
       const response = await this.getSalesPeople({ territory });
@@ -380,7 +380,7 @@ export const salesService = {
     }
   },
 
-  // ✅ NEW: Obtenir les statistiques par territoire
+  // Obtenir les statistiques par territoire
   async getTerritoryStats() {
     try {
       const response = await apiClient.get('/admin/analytics/territory-comparison');
@@ -388,6 +388,16 @@ export const salesService = {
     } catch (error) {
       throw new Error(error.response?.data?.message || 'Erreur lors du chargement des statistiques territoriales');
     }
+  },
+
+  // Obtenir les communes
+  async getCommunes() {
+    try {
+      const response = await apiClient.get('/listings');
+      console.log("AwAwA", response);
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Erreur lors du chargement des Communes');
+    }
   }
 };
-//salesService

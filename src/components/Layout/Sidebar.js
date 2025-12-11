@@ -19,11 +19,13 @@ import {
   Target,
   FileText,
   Calendar,
-  Network  // Use Network instead of Sitemap
+  Network,
+  Building
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { hasPermission } from '../../utils/permissions';
 import { PERMISSION_LABELS } from '../../utils/constants';
+import Communes from '../Sales/Communes';
 
 const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen }) => {
   const { user, logout, userType, isAdmin, isSalesPerson } = useAuth();
@@ -40,6 +42,13 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
           icon: Home,
           permission: null,
           description: 'Vue d\'ensemble des performances'
+        },
+        {
+          id: 'communes',
+          label: 'Communes',
+          icon: Building,
+          permission: null,
+          description: 'Vue d\'ensemble de communes'
         },
         {
           id: 'organization',
@@ -100,6 +109,13 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
           icon: Home,
           permission: null,
           description: 'Vue d\'ensemble de mes performances'
+        },
+        {
+          id: 'communes',
+          label: 'Communes',
+          icon: Building,
+          permission: null,
+          description: 'Vue d\'ensemble de communes'
         },
         {
           id: 'register-user',

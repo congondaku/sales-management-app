@@ -272,9 +272,9 @@ export const AuthProvider = ({ children }) => {
     // Utilitaires
     hasPermission,
     canManage,
-    isAdmin, // ✅ NEW
-    isSalesPerson, // ✅ NEW
-    getUserRole // ✅ NEW
+    isAdmin,
+    isSalesPerson,
+    getUserRole //
   };
 
   return (

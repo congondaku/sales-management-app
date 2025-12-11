@@ -3,7 +3,7 @@ import { useAuth } from '../../hooks/useAuth';
 import Sidebar from './Sidebar';
 import Header from './Header';
 
-// ✅ EXISTING: Admin Components
+// Admin Components
 import Dashboard from '../Dashboard/Dashboard';
 import SalesPeoplePage from '../SalesPeople/SalesPeoplePage';
 import CommissionsPage from '../Commissions/CommissionsPage';
@@ -12,13 +12,14 @@ import UsersPage from '../Users/UsersPage';
 import PermissionsPage from '../Permissions/PermissionsPage';
 import SettingsPage from '../Settings/SettingsPage';
 
-// ✅ NEW: Sales Person Components (you'll need to create these)
+// Sales Person Components (you'll need to create these)
 import SalesDashboard from '../Sales/SalesDashboard';
 import MyUsers from '../Sales/MyUsers';
 import MyCommissions from '../Sales/MyCommissions';
 import MyPerformance from '../Sales/MyPerformance';
 import RegisterUser from '../Sales/RegisterUser';
 import SalesProfile from '../Sales/SalesProfile.js';
+import Communes from '../Sales/Communes.js'
 
 const MainLayout = () => {
   const [currentPage, setCurrentPage] = useState('dashboard');
@@ -63,6 +64,10 @@ const MainLayout = () => {
         'sales-dashboard': {
           title: 'Mon Tableau de Bord',
           component: SalesDashboard
+        },
+        'communes': {
+          title: 'Communes',
+          component: Communes
         },
         'my-users': {
           title: 'Mes Utilisateurs',
@@ -109,11 +114,11 @@ const MainLayout = () => {
     }
     
     // Fallback to appropriate default based on user type
-    if (isSalesPerson()) {
-      return pages['sales-dashboard'] || { title: 'Dashboard', component: SalesDashboard };
-    } else if (isAdmin()) {
-      return pages['dashboard'] || { title: 'Dashboard', component: Dashboard };
-    }
+    // if (isSalesPerson()) {
+    //   return pages['sales-dashboard'] || { title: 'Dashboard', component: SalesDashboard };
+    // } else if (isAdmin()) {
+    //   return pages['dashboard'] || { title: 'Dashboard', component: Dashboard };
+    // }
     
     // Ultimate fallback
     return { 
