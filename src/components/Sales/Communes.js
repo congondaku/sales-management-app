@@ -89,6 +89,7 @@ const Communes = () => {
         label: `${commune}: ${count} annonce${count > 1 ? 's' : ''}`
       };
     });
+    counts.sort((a, b) => b.count - a.count);
     setCommuneCounts(counts);
   };
 
