@@ -10,6 +10,7 @@ const Communes = () => {
   const [listings, setListings] = useState([]);
   const [communesData, setCommunesData] = useState([]);
   const [communeCounts, setCommuneCounts] = useState([]);
+  // const unique = [...new Set(listings)]
 
   useEffect(() => {
     loadData();
