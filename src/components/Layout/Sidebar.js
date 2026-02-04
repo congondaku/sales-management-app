@@ -20,7 +20,8 @@ import {
   FileText,
   Calendar,
   Network,
-  Building
+  Building,
+  Megaphone
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { hasPermission } from '../../utils/permissions';
@@ -51,12 +52,19 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
           description: 'Vue d\'ensemble de communes'
         },
         {
-          id: 'organization',
-          label: 'Organigramme',
-          icon: Network,
+          id: 'annoces',
+          label: 'Annonces',
+          icon: Megaphone,
           permission: null,
-          description: 'Structure hiérarchique et promotions'
+          description: 'Vue d\'ensemble de communes'
         },
+        // {
+        //   id: 'organization',
+        //   label: 'Organigramme',
+        //   icon: Network,
+        //   permission: null,
+        //   description: 'Structure hiérarchique et promotions'
+        // },
         {
           id: 'sales-people',
           label: 'Commerciaux',
@@ -118,19 +126,33 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
           description: 'Vue d\'ensemble de communes'
         },
         {
+          id: 'annoces',
+          label: 'Annonces',
+          icon: Megaphone,
+          permission: null,
+          description: 'Vue d\'ensemble de communes'
+        },
+                {
+          id: 'analytics',
+          label: 'Analyses',
+          icon: BarChart3,
+          permission: 'canViewAnalytics',
+          description: 'Rapports et statistiques détaillées'
+        },
+        {
           id: 'register-user',
           label: 'Inscrire Utilisateur',
           icon: UserPlus,
           permission: null,
           description: 'Enregistrer un nouveau client'
         },
-        {
-          id: 'organization',
-          label: 'Organigramme',
-          icon: Network,
-          permission: null,
-          description: 'Structure de l\'organisation'
-        },
+        // {
+        //   id: 'organization',
+        //   label: 'Organigramme',
+        //   icon: Network,
+        //   permission: null,
+        //   description: 'Structure de l\'organisation'
+        // },
         {
           id: 'my-users',
           label: 'Mes Utilisateurs',

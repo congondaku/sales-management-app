@@ -20,6 +20,9 @@ import MyPerformance from '../Sales/MyPerformance';
 import RegisterUser from '../Sales/RegisterUser';
 import SalesProfile from '../Sales/SalesProfile.js';
 import Communes from '../Sales/Communes.js'
+import { ListingsManagement } from '@congondaku/listings-management';
+
+
 
 const MainLayout = () => {
   const [currentPage, setCurrentPage] = useState('dashboard');
@@ -35,8 +38,12 @@ const MainLayout = () => {
           component: Dashboard
         },
         communes: {
-          title: 'Tableau de Bord',
+          title: 'Communes',
           component: Communes
+        },
+        annoces: {
+          title: 'Annoces',
+          component: ListingsManagement
         },
         'sales-people': {
           title: 'Gestion des Commerciaux',
@@ -72,6 +79,10 @@ const MainLayout = () => {
         'communes': {
           title: 'Communes',
           component: Communes
+        },
+        'annoces': {
+          title: 'Annoces',
+          component: ListingsManagement
         },
         'my-users': {
           title: 'Mes Utilisateurs',
@@ -112,21 +123,21 @@ const MainLayout = () => {
   // ✅ ENHANCED: Fallback handling
   const getCurrentPageConfig = () => {
     const pageConfig = pages[currentPage];
-    
+
     if (pageConfig) {
       return pageConfig;
     }
-    
+
     // Fallback to appropriate default based on user type
     // if (isSalesPerson()) {
     //   return pages['sales-dashboard'] || { title: 'Dashboard', component: SalesDashboard };
     // } else if (isAdmin()) {
     //   return pages['dashboard'] || { title: 'Dashboard', component: Dashboard };
     // }
-    
+
     // Ultimate fallback
-    return { 
-      title: 'Page non trouvée', 
+    return {
+      title: 'Page non trouvée',
       component: () => (
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
@@ -144,25 +155,25 @@ const MainLayout = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Sidebar */}
-      <Sidebar 
+      <Sidebar
         currentPage={currentPage}
         setCurrentPage={setCurrentPage}
         isSidebarOpen={isSidebarOpen}
         setIsSidebarOpen={setIsSidebarOpen}
       />
-      
+
       {/* Contenu principal */}
       <div className="lg:ml-64">
         {/* Header */}
-        <Header 
+        <Header
           title={currentPageConfig.title}
           isSidebarOpen={isSidebarOpen}
           setIsSidebarOpen={setIsSidebarOpen}
         />
-        
+
         {/* Contenu de la page */}
         <main className="p-6">
-          <React.Suspense 
+          <React.Suspense
             fallback={
               <div className="flex items-center justify-center h-64">
                 <div className="text-center">
