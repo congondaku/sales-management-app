@@ -21,6 +21,7 @@ import RegisterUser from '../Sales/RegisterUser';
 import SalesProfile from '../Sales/SalesProfile.js';
 import Communes from '../Sales/Communes.js'
 import { ListingsManagement } from '@congondaku/listings-management';
+import Home from '../Copied/lib/components/Home/Home.jsx'
 
 
 
@@ -44,6 +45,10 @@ const MainLayout = () => {
         annoces: {
           title: 'Annoces',
           component: ListingsManagement
+        },
+        traffic: {
+          title: "Traffic",
+          component: Home
         },
         'sales-people': {
           title: 'Gestion des Commerciaux',
@@ -83,6 +88,10 @@ const MainLayout = () => {
         'annoces': {
           title: 'Annoces',
           component: ListingsManagement
+        },
+        'traffic': {
+          title: 'Traffic',
+          component: Home
         },
         'my-users': {
           title: 'Mes Utilisateurs',

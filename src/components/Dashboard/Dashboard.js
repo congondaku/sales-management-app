@@ -22,25 +22,25 @@ const Dashboard = () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       // Check if user has analytics permission
       if (hasPermission(user, 'canViewAnalytics')) {
         const response = await analyticsService.getAnalyticsOverview(period);
-        
+
         if (response.success) {
           const analyticsData = response.analytics;
-          
+
           // Map the backend data to dashboard format
           const dashboardData = {
             salesPeople: analyticsData.overview?.totalSalesPeople || 0,
             totalUsers: analyticsData.overview?.totalUsers || 0,
             totalCommissions: analyticsData.overview?.totalCommissionAmount || 0,
             conversionRate: analyticsData.overview?.conversionRate || 0,
-            
+
             commissionStats: analyticsData.commissionsByStatus || [],
             topPerformers: analyticsData.topPerformers || [],
             userRegistrationTrend: analyticsData.registrationTrend || [],
-            
+
             // Trend calculations (placeholder)
             salesPeopleTrend: null,
             usersTrend: null,
@@ -49,7 +49,7 @@ const Dashboard = () => {
 
             hideDetailedEarnings: analyticsData.hideDetailedEarnings || false
           };
-          
+
           setDashboardData(dashboardData);
         } else {
           setError(response.message || 'Erreur lors du chargement du tableau de bord');
@@ -121,16 +121,16 @@ const Dashboard = () => {
             Vue d'ensemble
           </h2>
           <p className="text-gray-600 dark:text-gray-400">
-            {dashboardData?.hasLimitedAccess 
+            {dashboardData?.hasLimitedAccess
               ? "Vue limitée - contactez votre administrateur pour plus de détails"
               : "Résumé des performances de votre équipe de vente"
             }
           </p>
         </div>
-        
+
         {/* Only show period selector if user has analytics permission */}
         {hasPermission(user, 'canViewAnalytics') && (
-          <select 
+          <select
             value={period}
             onChange={(e) => setPeriod(e.target.value)}
             className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
@@ -197,7 +197,7 @@ const Dashboard = () => {
         <>
           {/* Graphiques et widgets */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            
+
             {/* Tendance des inscriptions */}
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
               <div className="flex items-center justify-between mb-4">
@@ -205,12 +205,12 @@ const Dashboard = () => {
                   Tendance des Inscriptions
                 </h3>
                 <div className="text-sm text-gray-500 dark:text-gray-400">
-                  {period === 'week' ? '7 derniers jours' : 
-                   period === 'month' ? '30 derniers jours' :
-                   period === 'quarter' ? '3 derniers mois' : 'Cette année'}
+                  {period === 'week' ? '7 derniers jours' :
+                    period === 'month' ? '30 derniers jours' :
+                      period === 'quarter' ? '3 derniers mois' : 'Cette année'}
                 </div>
               </div>
-              
+
               {dashboardData?.userRegistrationTrend && dashboardData.userRegistrationTrend.length > 0 ? (
                 <div className="h-64">
                   <div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-400">
@@ -235,28 +235,26 @@ const Dashboard = () => {
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                 État des Commissions
               </h3>
-              
+
               <div className="space-y-4">
                 {dashboardData?.commissionStats?.length > 0 ? (
                   dashboardData.commissionStats.map((stat) => (
                     <div key={stat._id} className="flex items-center justify-between">
                       <div className="flex items-center space-x-3">
-                        <div className={`w-3 h-3 rounded-full ${
-                          stat._id === 'confirmed' ? 'bg-green-500' :
-                          stat._id === 'paid_out' ? 'bg-blue-500' : 
-                          stat._id === 'pending' ? 'bg-yellow-500' : 'bg-gray-500'
-                        }`}></div>
+                        <div className={`w-3 h-3 rounded-full ${stat._id === 'confirmed' ? 'bg-green-500' :
+                          stat._id === 'paid_out' ? 'bg-blue-500' :
+                            stat._id === 'pending' ? 'bg-yellow-500' : 'bg-gray-500'
+                          }`}></div>
                         <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                           {stat._id === 'confirmed' ? 'Confirmées' :
-                           stat._id === 'paid_out' ? 'Payées' : 
-                           stat._id === 'pending' ? 'En attente' : 
-                           stat._id === 'cancelled' ? 'Annulées' : stat._id}
+                            stat._id === 'paid_out' ? 'Payées' :
+                              stat._id === 'pending' ? 'En attente' :
+                                stat._id === 'cancelled' ? 'Annulées' : stat._id}
                         </span>
                       </div>
                       <div className="text-right">
                         <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                          {/* ✅ FIXED: Handle both number and string values */}
-                          {typeof stat.total === 'number' ? formatCurrency(stat.total) : (stat.total || 'N/A')}
+                          {typeof stat.total === 'number' ? formatCurrency(stat.total) : String(stat.total || 'N/A')}
                         </p>
                         <p className="text-xs text-gray-500 dark:text-gray-400">
                           {stat.count || 0} commission{(stat.count || 0) > 1 ? 's' : ''}
@@ -302,32 +300,31 @@ const Dashboard = () => {
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                 Top Performers
               </h3>
-              
+
               <div className="space-y-4">
                 {dashboardData.topPerformers.slice(0, 5).map((performer, index) => (
                   <div key={performer.salesPersonId || index} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
                     <div className="flex items-center space-x-4">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${
-                        index === 0 ? 'bg-yellow-500' :
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${index === 0 ? 'bg-yellow-500' :
                         index === 1 ? 'bg-gray-400' :
-                        index === 2 ? 'bg-orange-500' : 'bg-blue-500'
-                      }`}>
+                          index === 2 ? 'bg-orange-500' : 'bg-blue-500'
+                        }`}>
                         {index + 1}
                       </div>
                       <div>
                         <p className="font-medium text-gray-900 dark:text-white">
-                          {performer.name || 'Nom non disponible'}
+                          {String(performer.name || 'Nom non disponible')}
                         </p>
                         <p className="text-sm text-gray-500 dark:text-gray-400">
-                          {performer.salesId ? `${performer.salesId} • ` : ''}{performer.territory || 'Territoire non défini'}
+                          {performer.salesId ? `${performer.salesId} • ` : ''}{String(performer.territory || 'Territoire non défini')}
                         </p>
                       </div>
                     </div>
                     <div className="text-right">
                       <p className="font-semibold text-gray-900 dark:text-white">
-                        {typeof performer.totalEarnings === 'number' 
-                          ? formatCurrency(performer.totalEarnings) 
-                          : performer.totalEarnings || 'N/A'}
+                        {typeof performer.totalEarnings === 'number'
+                          ? formatCurrency(performer.totalEarnings)
+                          : String(performer.totalEarnings || 'N/A')}
                       </p>
                       <p className="text-sm text-gray-500 dark:text-gray-400">
                         {performer.totalCommissions || 0} commission{(performer.totalCommissions || 0) > 1 ? 's' : ''}
@@ -345,7 +342,7 @@ const Dashboard = () => {
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
             Fonctionnalités Disponibles
           </h3>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
               <Users className="h-8 w-8 text-blue-600 dark:text-blue-400 mb-2" />
@@ -354,7 +351,7 @@ const Dashboard = () => {
                 {hasPermission(user, 'canViewAllData') ? 'Accès disponible' : 'Accès limité'}
               </p>
             </div>
-            
+
             <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
               <DollarSign className="h-8 w-8 text-green-600 dark:text-green-400 mb-2" />
               <h4 className="font-medium text-green-800 dark:text-green-200">Commissions</h4>
@@ -362,7 +359,7 @@ const Dashboard = () => {
                 {hasPermission(user, 'canViewCommissions') ? 'Accès disponible' : 'Accès limité'}
               </p>
             </div>
-            
+
             <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
               <TrendingUp className="h-8 w-8 text-purple-600 dark:text-purple-400 mb-2" />
               <h4 className="font-medium text-purple-800 dark:text-purple-200">Analyses</h4>
@@ -370,7 +367,7 @@ const Dashboard = () => {
                 {hasPermission(user, 'canViewAnalytics') ? 'Accès disponible' : 'Permission requise'}
               </p>
             </div>
-            
+
             <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
               <User className="h-8 w-8 text-yellow-600 dark:text-yellow-400 mb-2" />
               <h4 className="font-medium text-yellow-800 dark:text-yellow-200">Gestion Équipe</h4>
@@ -384,26 +381,26 @@ const Dashboard = () => {
 
       {/* Alertes et notifications importantes */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        
+
         {/* Alertes système */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
             Informations du Compte
           </h3>
-          
+
           <div className="space-y-3">
             <div className="flex items-start space-x-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
               <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
               <div>
                 <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
-                  Rôle: {user?.role || 'Non défini'}
+                  Rôle: {String(user?.role || 'Non défini')}
                 </p>
                 <p className="text-sm text-blue-700 dark:text-blue-300">
                   Permissions actives: {user?.permissions ? Object.values(user.permissions).filter(p => p === true).length : 0}
                 </p>
               </div>
             </div>
-            
+
             {!hasPermission(user, 'canViewAnalytics') && (
               <div className="flex items-start space-x-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
                 <div className="w-2 h-2 bg-yellow-500 rounded-full mt-2"></div>
@@ -425,7 +422,7 @@ const Dashboard = () => {
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
             Actions Rapides
           </h3>
-          
+
           <div className="grid grid-cols-1 gap-3">
             {hasPermission(user, 'canCreateSalesPeople') && (
               <button className="p-3 text-left bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-800 transition-colors">
@@ -434,7 +431,7 @@ const Dashboard = () => {
                 </p>
               </button>
             )}
-            
+
             {hasPermission(user, 'canProcessPayouts') && (
               <button className="p-3 text-left bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-lg border border-green-200 dark:border-green-800 transition-colors">
                 <p className="text-sm font-medium text-green-800 dark:text-green-200">
@@ -442,7 +439,7 @@ const Dashboard = () => {
                 </p>
               </button>
             )}
-            
+
             {hasPermission(user, 'canViewAnalytics') && (
               <button className="p-3 text-left bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded-lg border border-purple-200 dark:border-purple-800 transition-colors">
                 <p className="text-sm font-medium text-purple-800 dark:text-purple-200">

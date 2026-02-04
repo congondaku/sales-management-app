@@ -21,7 +21,8 @@ import {
   Calendar,
   Network,
   Building,
-  Megaphone
+  Megaphone,
+  TrendingUpDown
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { hasPermission } from '../../utils/permissions';
@@ -58,13 +59,13 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
           permission: null,
           description: 'Vue d\'ensemble de communes'
         },
-        // {
-        //   id: 'organization',
-        //   label: 'Organigramme',
-        //   icon: Network,
-        //   permission: null,
-        //   description: 'Structure hiérarchique et promotions'
-        // },
+        {
+          id: 'traffic',
+          label: 'Traffic',
+          icon: TrendingUp,
+          permission: null,
+          description: 'Performance du site'
+        },
         {
           id: 'sales-people',
           label: 'Commerciaux',
@@ -132,7 +133,14 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
           permission: null,
           description: 'Vue d\'ensemble de communes'
         },
-                {
+        {
+          id: 'traffic',
+          label: 'Traffic',
+          icon: TrendingUp,
+          permission: null,
+          description: 'Performance du site'
+        },
+        {
           id: 'analytics',
           label: 'Analyses',
           icon: BarChart3,
