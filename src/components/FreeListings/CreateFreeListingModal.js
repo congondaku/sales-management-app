@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Home, Building, MapPin, DollarSign, Image as ImageIcon, Upload, Trash2 } from 'lucide-react';
+import { X, Home, Building, MapPin, DollarSign, Image as ImageIcon, Upload, Trash2, Clock } from 'lucide-react';
 import freeListingService from '../../services/freeListing.service';
 import LoadingSpinner from '../Commons/LoadingSpinner';
 
@@ -13,14 +13,18 @@ const CreateFreeListingModal = ({ onClose, onSuccess, userRole }) => {
   const [administrativeDivisions, setAdministrativeDivisions] = useState([]);
   const [imageFiles, setImageFiles] = useState([]);
   const [imagePreviews, setImagePreviews] = useState([]);
-  const [uploadingImages, setUploadingImages] = useState(false);
+  
+  // Duration selection states
+  const [duration, setDuration] = useState(6); // Default 6 months
+  const [durationUnit, setDurationUnit] = useState('months'); // Default months
+  
   const [formData, setFormData] = useState({
     // Default contact info
     listerFirstName: '',
     listerLastName: '',
     listerEmailAddress: DEFAULT_EMAIL,
     listerPhoneNumber: DEFAULT_PHONE,
-    
+
     // Property info
     typeOfListing: 'apartment',
     listingType: 'rent',
@@ -29,17 +33,17 @@ const CreateFreeListingModal = ({ onClose, onSuccess, userRole }) => {
     priceSale: '',
     currency: 'USD',
     negotiable: true,
-    
+
     // Location
     address: '',
     province: '',
     ville: '',
     commune: '',
     district: '',
-    
+
     // Images
     images: [],
-    
+
     // Details - ALL fields from schema
     details: {
       floor: 0,
@@ -62,7 +66,7 @@ const CreateFreeListingModal = ({ onClose, onSuccess, userRole }) => {
       swimming: false,
       accessForDisabled: false
     },
-    
+
     // Description
     description: '',
     title: ''
@@ -77,8 +81,7 @@ const CreateFreeListingModal = ({ onClose, onSuccess, userRole }) => {
       try {
         const response = await freeListingService.getAdministrativeDivisions();
         console.log('📍 Administrative divisions loaded:', response);
-        
-        // Response can be either response.data or direct array
+
         const divisions = response.data || response;
         setAdministrativeDivisions(Array.isArray(divisions) ? divisions : []);
       } catch (error) {
@@ -121,33 +124,53 @@ const CreateFreeListingModal = ({ onClose, onSuccess, userRole }) => {
   // Get available villes for selected province
   const getAvailableVilles = () => {
     if (!formData.province) return [];
-    
+
     const selectedProvince = administrativeDivisions.find(
       prov => prov.nom === formData.province
     );
-    
+
     return selectedProvince?.villes?.filter(ville => ville.isActive) || [];
   };
 
   // Get available communes for selected ville
   const getAvailableCommunes = () => {
     if (!formData.province || !formData.ville) return [];
-    
+
     const selectedProvince = administrativeDivisions.find(
       prov => prov.nom === formData.province
     );
-    
+
     const selectedVille = selectedProvince?.villes?.find(
       ville => ville.nom === formData.ville
     );
-    
+
     return selectedVille?.communes?.filter(commune => commune.isActive) || [];
+  };
+
+  // Calculate expiry date preview
+  const calculateExpiryDate = (dur, unit) => {
+    const now = new Date();
+    const expiry = new Date(now);
+    
+    if (unit === 'days') {
+      expiry.setDate(now.getDate() + dur);
+    } else if (unit === 'weeks') {
+      expiry.setDate(now.getDate() + (dur * 7));
+    } else if (unit === 'months') {
+      expiry.setMonth(now.getMonth() + dur);
+    }
+    
+    return expiry.toLocaleDateString('fr-FR', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
   };
 
   // Handle input change
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    
+
     if (name.startsWith('details.')) {
       const detailKey = name.split('.')[1];
       setFormData(prev => ({
@@ -163,7 +186,7 @@ const CreateFreeListingModal = ({ onClose, onSuccess, userRole }) => {
         [name]: type === 'checkbox' ? checked : value
       }));
     }
-    
+
     // Clear error for this field
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: null }));
@@ -189,6 +212,21 @@ const CreateFreeListingModal = ({ onClose, onSuccess, userRole }) => {
       ville,
       commune: ''
     }));
+  };
+
+  // Duration handlers
+  const handleDurationChange = (e) => {
+    const value = parseInt(e.target.value) || 0;
+    setDuration(value);
+  };
+
+  const handleDurationUnitChange = (e) => {
+    setDurationUnit(e.target.value);
+  };
+
+  const handleQuickDuration = (months) => {
+    setDuration(months);
+    setDurationUnit('months');
   };
 
   // Validate form
@@ -236,6 +274,32 @@ const CreateFreeListingModal = ({ onClose, onSuccess, userRole }) => {
       newErrors.images = 'Au moins une image est obligatoire';
     }
 
+    // Duration validation
+    if (!duration || duration <= 0) {
+      newErrors.duration = 'La durée doit être supérieure à 0';
+    }
+
+    // Role-based duration limits
+    if (userRole === 'admin' && duration > 120) {
+      newErrors.duration = 'Maximum 120 mois pour les administrateurs';
+    } else if (userRole === 'salesperson') {
+      if (durationUnit === 'months' && duration > 3) {
+        newErrors.duration = 'Maximum 3 mois pour les vendeurs';
+      } else if (durationUnit === 'weeks' && duration > 12) {
+        newErrors.duration = 'Maximum 12 semaines pour les vendeurs';
+      } else if (durationUnit === 'days' && duration > 90) {
+        newErrors.duration = 'Maximum 90 jours pour les vendeurs';
+      }
+    } else if (!userRole || userRole === 'user') {
+      if (durationUnit === 'months') {
+        newErrors.duration = 'Les utilisateurs ne peuvent utiliser que jours ou semaines';
+      } else if (durationUnit === 'weeks' && duration > 4) {
+        newErrors.duration = 'Maximum 4 semaines pour les utilisateurs';
+      } else if (durationUnit === 'days' && duration > 30) {
+        newErrors.duration = 'Maximum 30 jours pour les utilisateurs';
+      }
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -245,18 +309,15 @@ const CreateFreeListingModal = ({ onClose, onSuccess, userRole }) => {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
 
-    // Create preview URLs
     const newPreviews = files.map(file => URL.createObjectURL(file));
     setImagePreviews(prev => [...prev, ...newPreviews]);
     setImageFiles(prev => [...prev, ...files]);
 
-    // Also update formData.images with preview URLs for validation
     setFormData(prev => ({
       ...prev,
       images: [...prev.images, ...newPreviews]
     }));
 
-    // Clear error if exists
     if (errors.images) {
       setErrors(prev => ({ ...prev, images: null }));
     }
@@ -264,65 +325,21 @@ const CreateFreeListingModal = ({ onClose, onSuccess, userRole }) => {
 
   // Remove image
   const handleRemoveImage = (index) => {
-    // Revoke the object URL to avoid memory leaks
     URL.revokeObjectURL(imagePreviews[index]);
     
     setImagePreviews(prev => prev.filter((_, i) => i !== index));
     setImageFiles(prev => prev.filter((_, i) => i !== index));
     
-    // Also remove from formData.images
     setFormData(prev => ({
       ...prev,
       images: prev.images.filter((_, i) => i !== index)
     }));
   };
 
-  // Upload images to backend
-  const uploadImages = async () => {
-    if (imageFiles.length === 0) return [];
-
-    setUploadingImages(true);
-    try {
-      const uploadedUrls = [];
-
-      // Upload each file to the backend
-      for (const file of imageFiles) {
-        const formData = new FormData();
-        formData.append('image', file);
-
-        // TODO: Replace with your actual image upload endpoint
-        // For now, using a placeholder endpoint - update this to match your backend
-        const response = await fetch('/api/upload/image', {
-          method: 'POST',
-          body: formData,
-          // Add authentication if needed
-          // headers: {
-          //   'Authorization': `Bearer ${token}`
-          // }
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to upload image');
-        }
-
-        const data = await response.json();
-        uploadedUrls.push(data.url || data.imageUrl || data.path);
-      }
-
-      return uploadedUrls;
-    } catch (error) {
-      console.error('Error uploading images:', error);
-      throw new Error('Erreur lors du téléchargement des images');
-    } finally {
-      setUploadingImages(false);
-    }
-  };
-
-  // Handle submit
+  // ✅ UPDATED: Handle submit - Create AND Activate in one go
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validate that we have image files
     if (imageFiles.length === 0) {
       setErrors(prev => ({ ...prev, images: 'Au moins une image est obligatoire' }));
       return;
@@ -334,41 +351,58 @@ const CreateFreeListingModal = ({ onClose, onSuccess, userRole }) => {
 
     setLoading(true);
     try {
-      console.log('🚀 Starting form submission...');
-      console.log('📸 Image files:', imageFiles);
-      console.log('📸 Number of images:', imageFiles.length);
-      
-      // Create FormData to send files and data
+      console.log('🚀 Starting listing creation with auto-activation...');
+      console.log('📅 Selected duration:', duration, durationUnit);
+
+      // Create FormData
       const submitFormData = new FormData();
-      
+
       // Append all image files
       imageFiles.forEach((file, index) => {
-        console.log(`📸 Appending image ${index + 1}:`, file.name, file.type, file.size);
+        console.log(`📸 Image ${index + 1}:`, file.name, file.type, `${(file.size / 1024).toFixed(2)} KB`);
         submitFormData.append('images', file);
       });
-      
-      // Append all form fields individually
+
+      // Contact info
       submitFormData.append('listerFirstName', formData.listerFirstName);
       submitFormData.append('listerLastName', formData.listerLastName);
       submitFormData.append('listerEmailAddress', formData.listerEmailAddress);
       submitFormData.append('listerPhoneNumber', formData.listerPhoneNumber);
-      
+
+      // Property info
       submitFormData.append('typeOfListing', formData.typeOfListing);
       submitFormData.append('listingType', formData.listingType);
       submitFormData.append('currency', formData.currency);
       submitFormData.append('negotiable', formData.negotiable.toString());
-      
-      // Append prices based on listing type (convert to number)
-      if (formData.listingType === 'rent' && formData.priceMonthly) {
-        submitFormData.append('priceMonthly', Number(formData.priceMonthly));
+
+      // ✅ FIXED: Price handling - only send the relevant price field
+      console.log('💰 Price info:', {
+        listingType: formData.listingType,
+        priceMonthly: formData.priceMonthly,
+        priceDaily: formData.priceDaily,
+        priceSale: formData.priceSale
+      });
+
+      if (formData.listingType === 'rent') {
+        const price = Number(formData.priceMonthly);
+        if (price && price > 0) {
+          submitFormData.append('priceMonthly', price);
+          console.log('✅ Adding priceMonthly:', price);
+        }
+      } else if (formData.listingType === 'daily') {
+        const price = Number(formData.priceDaily);
+        if (price && price > 0) {
+          submitFormData.append('priceDaily', price);
+          console.log('✅ Adding priceDaily:', price);
+        }
+      } else if (formData.listingType === 'sale') {
+        const price = Number(formData.priceSale);
+        if (price && price > 0) {
+          submitFormData.append('priceSale', price);
+          console.log('✅ Adding priceSale:', price);
+        }
       }
-      if (formData.listingType === 'daily' && formData.priceDaily) {
-        submitFormData.append('priceDaily', Number(formData.priceDaily));
-      }
-      if (formData.listingType === 'sale' && formData.priceSale) {
-        submitFormData.append('priceSale', Number(formData.priceSale));
-      }
-      
+
       // Location fields
       submitFormData.append('address', formData.address);
       submitFormData.append('province', formData.province);
@@ -377,10 +411,10 @@ const CreateFreeListingModal = ({ onClose, onSuccess, userRole }) => {
       if (formData.district) {
         submitFormData.append('district', formData.district);
       }
-      
+
       // Details as JSON string
       submitFormData.append('details', JSON.stringify(formData.details));
-      
+
       // Optional fields
       if (formData.description) {
         submitFormData.append('description', formData.description);
@@ -389,26 +423,69 @@ const CreateFreeListingModal = ({ onClose, onSuccess, userRole }) => {
         submitFormData.append('title', formData.title);
       }
 
-      // Debug: Log all FormData entries
-      console.log('📦 FormData contents:');
+      // Debug: Log all FormData
+      console.log('📦 Complete FormData:');
       for (let pair of submitFormData.entries()) {
         if (pair[1] instanceof File) {
-          console.log(`  ${pair[0]}: [File] ${pair[1].name} (${pair[1].size} bytes)`);
+          console.log(`  📸 ${pair[0]}: [File] ${pair[1].name}`);
         } else {
-          console.log(`  ${pair[0]}: ${pair[1]}`);
+          console.log(`  📝 ${pair[0]}: ${pair[1]}`);
         }
       }
 
-      // Call the service with FormData
-      // Note: axios automatically sets Content-Type: multipart/form-data for FormData
-      console.log('📤 Sending request to backend...');
-      const response = await freeListingService.createListing(submitFormData);
-      console.log('✅ Success! Response:', response);
-      onSuccess(response.listing);
+      // STEP 1: Create the listing
+      console.log('📤 Step 1: Creating listing...');
+      const createResponse = await freeListingService.createListing(submitFormData);
+      console.log('✅ Listing created:', createResponse);
+
+      const listingId = createResponse.listing._id || createResponse.listing.id;
+
+      // STEP 2: Automatically activate as free listing
+      console.log('🎁 Step 2: Auto-activating as free listing...');
+
+      let activateResponse;
+
+      if (userRole === 'admin') {
+        activateResponse = await freeListingService.activateFreeListing(
+          listingId,
+          duration,
+          durationUnit
+        );
+      } else if (userRole === 'salesperson') {
+        activateResponse = await freeListingService.activateFreeListingSalesperson(
+          listingId,
+          duration,
+          durationUnit
+        );
+      } else {
+        activateResponse = await freeListingService.activateFreeListing(
+          listingId,
+          duration,
+          durationUnit
+        );
+      }
+
+      console.log('✅ Listing activated:', activateResponse);
+
+      // Show success message
+      alert(`✅ Annonce créée et activée avec succès!\n\nDurée: ${duration} ${
+        durationUnit === 'months' ? 'mois' : 
+        durationUnit === 'weeks' ? 'semaines' : 
+        'jours'
+      }\nExpiration: ${calculateExpiryDate(duration, durationUnit)}`);
+
+      // Close modal and refresh
+      onSuccess(activateResponse.listing);
+
     } catch (error) {
-      console.error('❌ Error creating listing:', error);
+      console.error('❌ Error:', error);
       console.error('❌ Error response:', error.response?.data);
-      alert(error.message || 'Erreur lors de la création de l\'annonce');
+
+      const errorMessage = error.response?.data?.message
+        || error.message
+        || 'Erreur lors de la création de l\'annonce';
+
+      alert(`❌ Erreur: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
@@ -446,7 +523,7 @@ const CreateFreeListingModal = ({ onClose, onSuccess, userRole }) => {
                   <Building className="h-5 w-5 mr-2 text-blue-600" />
                   Informations de Contact
                 </h3>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -457,9 +534,7 @@ const CreateFreeListingModal = ({ onClose, onSuccess, userRole }) => {
                       name="listerFirstName"
                       value={formData.listerFirstName}
                       onChange={handleChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                        errors.listerFirstName ? 'border-red-500' : 'border-gray-300'
-                      }`}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.listerFirstName ? 'border-red-500' : 'border-gray-300'}`}
                       placeholder="Ex: Jean"
                     />
                     {errors.listerFirstName && (
@@ -476,9 +551,7 @@ const CreateFreeListingModal = ({ onClose, onSuccess, userRole }) => {
                       name="listerLastName"
                       value={formData.listerLastName}
                       onChange={handleChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                        errors.listerLastName ? 'border-red-500' : 'border-gray-300'
-                      }`}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.listerLastName ? 'border-red-500' : 'border-gray-300'}`}
                       placeholder="Ex: Kabila"
                     />
                     {errors.listerLastName && (
@@ -495,9 +568,7 @@ const CreateFreeListingModal = ({ onClose, onSuccess, userRole }) => {
                       name="listerEmailAddress"
                       value={formData.listerEmailAddress}
                       onChange={handleChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                        errors.listerEmailAddress ? 'border-red-500' : 'border-gray-300'
-                      }`}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.listerEmailAddress ? 'border-red-500' : 'border-gray-300'}`}
                     />
                     {errors.listerEmailAddress && (
                       <p className="mt-1 text-sm text-red-600">{errors.listerEmailAddress}</p>
@@ -513,9 +584,7 @@ const CreateFreeListingModal = ({ onClose, onSuccess, userRole }) => {
                       name="listerPhoneNumber"
                       value={formData.listerPhoneNumber}
                       onChange={handleChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                        errors.listerPhoneNumber ? 'border-red-500' : 'border-gray-300'
-                      }`}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.listerPhoneNumber ? 'border-red-500' : 'border-gray-300'}`}
                     />
                     {errors.listerPhoneNumber && (
                       <p className="mt-1 text-sm text-red-600">{errors.listerPhoneNumber}</p>
@@ -530,7 +599,7 @@ const CreateFreeListingModal = ({ onClose, onSuccess, userRole }) => {
                   <Home className="h-5 w-5 mr-2 text-blue-600" />
                   Type de Propriété
                 </h3>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -591,7 +660,7 @@ const CreateFreeListingModal = ({ onClose, onSuccess, userRole }) => {
                   <DollarSign className="h-5 w-5 mr-2 text-blue-600" />
                   Prix
                 </h3>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {formData.listingType === 'rent' && (
                     <div>
@@ -603,9 +672,9 @@ const CreateFreeListingModal = ({ onClose, onSuccess, userRole }) => {
                         name="priceMonthly"
                         value={formData.priceMonthly}
                         onChange={handleChange}
-                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                          errors.priceMonthly ? 'border-red-500' : 'border-gray-300'
-                        }`}
+                        min="0"
+                        step="0.01"
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.priceMonthly ? 'border-red-500' : 'border-gray-300'}`}
                         placeholder="Ex: 800"
                       />
                       {errors.priceMonthly && (
@@ -624,9 +693,9 @@ const CreateFreeListingModal = ({ onClose, onSuccess, userRole }) => {
                         name="priceDaily"
                         value={formData.priceDaily}
                         onChange={handleChange}
-                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                          errors.priceDaily ? 'border-red-500' : 'border-gray-300'
-                        }`}
+                        min="0"
+                        step="0.01"
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.priceDaily ? 'border-red-500' : 'border-gray-300'}`}
                         placeholder="Ex: 50"
                       />
                       {errors.priceDaily && (
@@ -645,9 +714,9 @@ const CreateFreeListingModal = ({ onClose, onSuccess, userRole }) => {
                         name="priceSale"
                         value={formData.priceSale}
                         onChange={handleChange}
-                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                          errors.priceSale ? 'border-red-500' : 'border-gray-300'
-                        }`}
+                        min="0"
+                        step="0.01"
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.priceSale ? 'border-red-500' : 'border-gray-300'}`}
                         placeholder="Ex: 150000"
                       />
                       {errors.priceSale && (
@@ -677,7 +746,7 @@ const CreateFreeListingModal = ({ onClose, onSuccess, userRole }) => {
                   <MapPin className="h-5 w-5 mr-2 text-blue-600" />
                   Localisation
                 </h3>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -688,9 +757,7 @@ const CreateFreeListingModal = ({ onClose, onSuccess, userRole }) => {
                       name="address"
                       value={formData.address}
                       onChange={handleChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                        errors.address ? 'border-red-500' : 'border-gray-300'
-                      }`}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.address ? 'border-red-500' : 'border-gray-300'}`}
                       placeholder="Ex: 123 Avenue de la Liberté"
                     />
                     {errors.address && (
@@ -706,9 +773,7 @@ const CreateFreeListingModal = ({ onClose, onSuccess, userRole }) => {
                       name="province"
                       value={formData.province}
                       onChange={handleProvinceChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                        errors.province ? 'border-red-500' : 'border-gray-300'
-                      }`}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.province ? 'border-red-500' : 'border-gray-300'}`}
                     >
                       <option value="">Sélectionner une province</option>
                       {getAvailableProvinces().map(province => (
@@ -730,9 +795,7 @@ const CreateFreeListingModal = ({ onClose, onSuccess, userRole }) => {
                       name="ville"
                       value={formData.ville}
                       onChange={handleVilleChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                        errors.ville ? 'border-red-500' : 'border-gray-300'
-                      }`}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.ville ? 'border-red-500' : 'border-gray-300'}`}
                       disabled={!formData.province}
                     >
                       <option value="">Sélectionner une ville</option>
@@ -755,9 +818,7 @@ const CreateFreeListingModal = ({ onClose, onSuccess, userRole }) => {
                       name="commune"
                       value={formData.commune}
                       onChange={handleChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                        errors.commune ? 'border-red-500' : 'border-gray-300'
-                      }`}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.commune ? 'border-red-500' : 'border-gray-300'}`}
                       disabled={!formData.ville}
                     >
                       <option value="">Sélectionner une commune</option>
@@ -793,8 +854,7 @@ const CreateFreeListingModal = ({ onClose, onSuccess, userRole }) => {
                 <h3 className="text-lg font-medium text-gray-900">
                   Détails de la Propriété
                 </h3>
-                
-                {/* Room counts */}
+
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -911,136 +971,53 @@ const CreateFreeListingModal = ({ onClose, onSuccess, userRole }) => {
                   </div>
                 </div>
 
-                {/* Amenities - Basic */}
+                {/* Amenities */}
                 <div>
                   <h4 className="text-sm font-medium text-gray-900 mb-3">Équipements de base</h4>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <label className="flex items-center space-x-2 text-sm">
-                      <input
-                        type="checkbox"
-                        name="details.parking"
-                        checked={formData.details.parking}
-                        onChange={handleChange}
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                      />
-                      <span>Parking</span>
-                    </label>
-
-                    <label className="flex items-center space-x-2 text-sm">
-                      <input
-                        type="checkbox"
-                        name="details.garden"
-                        checked={formData.details.garden}
-                        onChange={handleChange}
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                      />
-                      <span>Jardin</span>
-                    </label>
-
-                    <label className="flex items-center space-x-2 text-sm">
-                      <input
-                        type="checkbox"
-                        name="details.furnished"
-                        checked={formData.details.furnished}
-                        onChange={handleChange}
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                      />
-                      <span>Meublé</span>
-                    </label>
-
-                    <label className="flex items-center space-x-2 text-sm">
-                      <input
-                        type="checkbox"
-                        name="details.swimming"
-                        checked={formData.details.swimming}
-                        onChange={handleChange}
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                      />
-                      <span>Piscine</span>
-                    </label>
-
-                    <label className="flex items-center space-x-2 text-sm">
-                      <input
-                        type="checkbox"
-                        name="details.accessForDisabled"
-                        checked={formData.details.accessForDisabled}
-                        onChange={handleChange}
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                      />
-                      <span>Accès handicapés</span>
-                    </label>
+                    {['parking', 'garden', 'furnished', 'swimming', 'accessForDisabled'].map(amenity => (
+                      <label key={amenity} className="flex items-center space-x-2 text-sm">
+                        <input
+                          type="checkbox"
+                          name={`details.${amenity}`}
+                          checked={formData.details[amenity]}
+                          onChange={handleChange}
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        />
+                        <span>
+                          {amenity === 'parking' && 'Parking'}
+                          {amenity === 'garden' && 'Jardin'}
+                          {amenity === 'furnished' && 'Meublé'}
+                          {amenity === 'swimming' && 'Piscine'}
+                          {amenity === 'accessForDisabled' && 'Accès handicapés'}
+                        </span>
+                      </label>
+                    ))}
                   </div>
                 </div>
 
-                {/* Amenities - Services */}
                 <div>
                   <h4 className="text-sm font-medium text-gray-900 mb-3">Services et commodités</h4>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <label className="flex items-center space-x-2 text-sm">
-                      <input
-                        type="checkbox"
-                        name="details.wifi"
-                        checked={formData.details.wifi}
-                        onChange={handleChange}
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                      />
-                      <span>WiFi</span>
-                    </label>
-
-                    <label className="flex items-center space-x-2 text-sm">
-                      <input
-                        type="checkbox"
-                        name="details.airConditioner"
-                        checked={formData.details.airConditioner}
-                        onChange={handleChange}
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                      />
-                      <span>Climatisation</span>
-                    </label>
-
-                    <label className="flex items-center space-x-2 text-sm">
-                      <input
-                        type="checkbox"
-                        name="details.security"
-                        checked={formData.details.security}
-                        onChange={handleChange}
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                      />
-                      <span>Sécurité</span>
-                    </label>
-
-                    <label className="flex items-center space-x-2 text-sm">
-                      <input
-                        type="checkbox"
-                        name="details.solarPower"
-                        checked={formData.details.solarPower}
-                        onChange={handleChange}
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                      />
-                      <span>Énergie solaire</span>
-                    </label>
-
-                    <label className="flex items-center space-x-2 text-sm">
-                      <input
-                        type="checkbox"
-                        name="details.waterTank"
-                        checked={formData.details.waterTank}
-                        onChange={handleChange}
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                      />
-                      <span>Réservoir d'eau</span>
-                    </label>
-
-                    <label className="flex items-center space-x-2 text-sm">
-                      <input
-                        type="checkbox"
-                        name="details.generator"
-                        checked={formData.details.generator}
-                        onChange={handleChange}
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                      />
-                      <span>Générateur</span>
-                    </label>
+                    {['wifi', 'airConditioner', 'security', 'solarPower', 'waterTank', 'generator'].map(service => (
+                      <label key={service} className="flex items-center space-x-2 text-sm">
+                        <input
+                          type="checkbox"
+                          name={`details.${service}`}
+                          checked={formData.details[service]}
+                          onChange={handleChange}
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        />
+                        <span>
+                          {service === 'wifi' && 'WiFi'}
+                          {service === 'airConditioner' && 'Climatisation'}
+                          {service === 'security' && 'Sécurité'}
+                          {service === 'solarPower' && 'Énergie solaire'}
+                          {service === 'waterTank' && 'Réservoir d\'eau'}
+                          {service === 'generator' && 'Générateur'}
+                        </span>
+                      </label>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -1060,6 +1037,111 @@ const CreateFreeListingModal = ({ onClose, onSuccess, userRole }) => {
                 />
               </div>
 
+              {/* Duration Selection */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium text-gray-900 flex items-center">
+                  <Clock className="h-5 w-5 mr-2 text-blue-600" />
+                  Durée de Publication Gratuite *
+                </h3>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {[3, 6, 12, 24].map(months => (
+                    <button
+                      key={months}
+                      type="button"
+                      onClick={() => handleQuickDuration(months)}
+                      className={`px-4 py-2 rounded-lg border-2 transition-colors ${
+                        duration === months && durationUnit === 'months'
+                          ? 'border-blue-600 bg-blue-50 text-blue-700 font-medium'
+                          : 'border-gray-300 bg-white text-gray-700 hover:border-blue-300'
+                      }`}
+                    >
+                      {months === 12 ? '1 An' : months === 24 ? '2 Ans' : `${months} Mois`}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Durée personnalisée
+                    </label>
+                    <input
+                      type="number"
+                      value={duration}
+                      onChange={handleDurationChange}
+                      min="1"
+                      max={userRole === 'admin' ? 120 : userRole === 'salesperson' ? 12 : 30}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                        errors.duration ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                    />
+                    {errors.duration && (
+                      <p className="mt-1 text-sm text-red-600">{errors.duration}</p>
+                    )}
+                    <p className="mt-1 text-xs text-gray-500">
+                      {userRole === 'admin' 
+                        ? 'Maximum: 120 mois (10 ans)' 
+                        : userRole === 'salesperson'
+                        ? 'Maximum: 3 mois / 12 semaines / 90 jours'
+                        : 'Maximum: 30 jours / 4 semaines'}
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Unité
+                    </label>
+                    <select
+                      value={durationUnit}
+                      onChange={handleDurationUnitChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      {(userRole === 'admin' || userRole === 'salesperson') ? (
+                        <>
+                          <option value="days">Jours</option>
+                          <option value="weeks">Semaines</option>
+                          <option value="months">Mois</option>
+                        </>
+                      ) : (
+                        <>
+                          <option value="days">Jours</option>
+                          <option value="weeks">Semaines</option>
+                        </>
+                      )}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <div className="flex items-start">
+                    <svg className="h-5 w-5 text-green-600 mr-2 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div>
+                      <p className="text-sm font-medium text-green-800">
+                        L'annonce sera active pendant {duration} {
+                          durationUnit === 'months' ? (duration === 1 ? 'mois' : 'mois') : 
+                          durationUnit === 'weeks' ? (duration === 1 ? 'semaine' : 'semaines') : 
+                          (duration === 1 ? 'jour' : 'jours')
+                        }
+                      </p>
+                      <p className="text-xs text-green-600 mt-1">
+                        Date d'expiration: {calculateExpiryDate(duration, durationUnit)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {userRole === 'admin' && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <p className="text-sm text-blue-800">
+                      <strong>Administrateur</strong> : Vous pouvez activer jusqu'à 10 ans (120 mois).
+                    </p>
+                  </div>
+                )}
+              </div>
+
               {/* Image Upload */}
               <div className="space-y-4">
                 <h3 className="text-lg font-medium text-gray-900 flex items-center">
@@ -1067,7 +1149,6 @@ const CreateFreeListingModal = ({ onClose, onSuccess, userRole }) => {
                   Images * <span className="text-sm font-normal text-gray-500 ml-2">(Au moins une image requise)</span>
                 </h3>
 
-                {/* Upload Button */}
                 <div className="flex items-center gap-4">
                   <label className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg border-2 border-dashed border-blue-300 hover:bg-blue-100 cursor-pointer transition-colors">
                     <Upload className="h-5 w-5" />
@@ -1080,20 +1161,12 @@ const CreateFreeListingModal = ({ onClose, onSuccess, userRole }) => {
                       className="hidden"
                     />
                   </label>
-                  {uploadingImages && (
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <LoadingSpinner className="h-4 w-4" />
-                      <span>Téléchargement...</span>
-                    </div>
-                  )}
                 </div>
 
-                {/* Error Message */}
                 {errors.images && (
                   <p className="text-sm text-red-600">{errors.images}</p>
                 )}
 
-                {/* Image Previews */}
                 {imagePreviews.length > 0 && (
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     {imagePreviews.map((preview, index) => (
@@ -1120,14 +1193,12 @@ const CreateFreeListingModal = ({ onClose, onSuccess, userRole }) => {
                   </div>
                 )}
 
-                {/* Image Upload Tips */}
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                  <h4 className="text-sm font-medium text-gray-900 mb-2">Conseils pour les images :</h4>
+                  <h4 className="text-sm font-medium text-gray-900 mb-2">Conseils :</h4>
                   <ul className="text-sm text-gray-600 space-y-1">
-                    <li>• Téléchargez des images claires et bien éclairées</li>
-                    <li>• La première image sera l'image principale de votre annonce</li>
-                    <li>• Formats acceptés : JPG, PNG, WEBP</li>
-                    <li>• Vous pouvez télécharger plusieurs images</li>
+                    <li>• Images claires et bien éclairées</li>
+                    <li>• La première image sera l'image principale</li>
+                    <li>• Formats: JPG, PNG, WEBP</li>
                   </ul>
                 </div>
               </div>
@@ -1151,10 +1222,10 @@ const CreateFreeListingModal = ({ onClose, onSuccess, userRole }) => {
                 {loading ? (
                   <>
                     <LoadingSpinner className="mr-2" />
-                    Création...
+                    Création en cours...
                   </>
                 ) : (
-                  'Créer l\'Annonce'
+                  'Créer et Activer'
                 )}
               </button>
             </div>

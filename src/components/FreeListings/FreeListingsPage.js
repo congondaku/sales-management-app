@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Filter, RefreshCw } from 'lucide-react';
+import { Plus, Search, Filter, RefreshCw, MapPin, X } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import freeListingService from '../../services/freeListing.service';
 import LoadingSpinner from '../Commons/LoadingSpinner';
@@ -15,8 +15,16 @@ const FreeListingsPage = () => {
   // State
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadingLocations, setLoadingLocations] = useState(true);
+  const [administrativeDivisions, setAdministrativeDivisions] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all'); // all, unpaid, active
+  
+  // Location filters
+  const [selectedProvince, setSelectedProvince] = useState('');
+  const [selectedVille, setSelectedVille] = useState('');
+  const [selectedCommune, setSelectedCommune] = useState('');
+  
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showActivateModal, setShowActivateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -24,10 +32,30 @@ const FreeListingsPage = () => {
   const [toast, setToast] = useState(null);
   const [pagination, setPagination] = useState({
     page: 1,
-    limit: 20,
+    limit: 50,
     total: 0,
     totalPages: 0
   });
+
+  // Fetch administrative divisions
+  useEffect(() => {
+    const fetchAdministrativeDivisions = async () => {
+      setLoadingLocations(true);
+      try {
+        const response = await freeListingService.getAdministrativeDivisions();
+        console.log('📍 Administrative divisions loaded:', response);
+
+        const divisions = response.data || response;
+        setAdministrativeDivisions(Array.isArray(divisions) ? divisions : []);
+      } catch (error) {
+        console.error('Error fetching administrative divisions:', error);
+        showToast('Erreur lors du chargement des provinces', 'error');
+      } finally {
+        setLoadingLocations(false);
+      }
+    };
+    fetchAdministrativeDivisions();
+  }, []);
 
   // Fetch listings
   const fetchListings = async () => {
@@ -53,6 +81,13 @@ const FreeListingsPage = () => {
           status: filterStatus === 'active' ? 'available' : undefined
         });
         setListings(response.listings || []);
+        if (response.pagination) {
+          setPagination(prev => ({
+            ...prev,
+            total: response.pagination.total || 0,
+            totalPages: response.pagination.totalPages || 0
+          }));
+        }
       }
     } catch (error) {
       showToast('Erreur lors du chargement des annonces', 'error');
@@ -66,6 +101,59 @@ const FreeListingsPage = () => {
     fetchListings();
   }, [pagination.page, filterStatus]);
 
+  // Get available provinces
+  const getAvailableProvinces = () => {
+    return administrativeDivisions.filter(prov => prov.isActive);
+  };
+
+  // Get available villes for selected province
+  const getAvailableVilles = () => {
+    if (!selectedProvince) return [];
+
+    const province = administrativeDivisions.find(
+      prov => prov.nom === selectedProvince
+    );
+
+    return province?.villes?.filter(ville => ville.isActive) || [];
+  };
+
+  // Get available communes for selected ville
+  const getAvailableCommunes = () => {
+    if (!selectedProvince || !selectedVille) return [];
+
+    const province = administrativeDivisions.find(
+      prov => prov.nom === selectedProvince
+    );
+
+    const ville = province?.villes?.find(
+      v => v.nom === selectedVille
+    );
+
+    return ville?.communes?.filter(commune => commune.isActive) || [];
+  };
+
+  // Handle province change
+  const handleProvinceChange = (e) => {
+    const province = e.target.value;
+    setSelectedProvince(province);
+    setSelectedVille('');
+    setSelectedCommune('');
+  };
+
+  // Handle ville change
+  const handleVilleChange = (e) => {
+    const ville = e.target.value;
+    setSelectedVille(ville);
+    setSelectedCommune('');
+  };
+
+  // Clear all location filters
+  const clearLocationFilters = () => {
+    setSelectedProvince('');
+    setSelectedVille('');
+    setSelectedCommune('');
+  };
+
   // Toast helper
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
@@ -75,9 +163,8 @@ const FreeListingsPage = () => {
   // Handle create listing success
   const handleListingCreated = (listing) => {
     setShowCreateModal(false);
-    setSelectedListing(listing);
-    setShowActivateModal(true);
-    showToast('Annonce créée avec succès! Activez-la maintenant.', 'success');
+    fetchListings();
+    showToast('Annonce créée et activée avec succès!', 'success');
   };
 
   // Handle activate listing success
@@ -116,18 +203,39 @@ const FreeListingsPage = () => {
     }
   };
 
-  // Filter listings by search term
+  // Filter listings by all criteria
   const filteredListings = listings.filter(listing => {
-    if (!searchTerm) return true;
-    
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      listing.title?.toLowerCase().includes(searchLower) ||
-      listing.address?.toLowerCase().includes(searchLower) ||
-      listing.commune?.toLowerCase().includes(searchLower) ||
-      listing.ville?.toLowerCase().includes(searchLower)
-    );
+    // Search term filter
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
+      const matchesSearch = (
+        listing.title?.toLowerCase().includes(searchLower) ||
+        listing.address?.toLowerCase().includes(searchLower) ||
+        listing.commune?.toLowerCase().includes(searchLower) ||
+        listing.ville?.toLowerCase().includes(searchLower) ||
+        listing.province?.toLowerCase().includes(searchLower) ||
+        listing.listerFirstName?.toLowerCase().includes(searchLower) ||
+        listing.listerLastName?.toLowerCase().includes(searchLower)
+      );
+      if (!matchesSearch) return false;
+    }
+
+    // Location filters
+    if (selectedProvince && listing.province !== selectedProvince) {
+      return false;
+    }
+    if (selectedVille && listing.ville !== selectedVille) {
+      return false;
+    }
+    if (selectedCommune && listing.commune !== selectedCommune) {
+      return false;
+    }
+
+    return true;
   });
+
+  // Check if any location filter is active
+  const hasLocationFilter = selectedProvince || selectedVille || selectedCommune;
 
   return (
     <div className="space-y-6">
@@ -152,7 +260,8 @@ const FreeListingsPage = () => {
       </div>
 
       {/* Filters and Search */}
-      <div className="bg-white rounded-lg shadow p-4">
+      <div className="bg-white rounded-lg shadow p-4 space-y-4">
+        {/* Top Row - Search and Status */}
         <div className="flex flex-col sm:flex-row gap-4">
           {/* Search */}
           <div className="flex-1">
@@ -160,7 +269,7 @@ const FreeListingsPage = () => {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
               <input
                 type="text"
-                placeholder="Rechercher par titre, adresse, commune..."
+                placeholder="Rechercher par titre, adresse, commune, nom..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -192,12 +301,115 @@ const FreeListingsPage = () => {
           </button>
         </div>
 
+        {/* Location Filters Row */}
+        {!loadingLocations && (
+          <div className="border-t pt-4">
+            <div className="flex items-center gap-2 mb-3">
+              <MapPin className="h-5 w-5 text-gray-400" />
+              <span className="text-sm font-medium text-gray-700">Filtrer par localisation</span>
+              {hasLocationFilter && (
+                <button
+                  onClick={clearLocationFilters}
+                  className="ml-auto text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                >
+                  <X className="h-4 w-4" />
+                  Effacer
+                </button>
+              )}
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Province Filter */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Province
+                </label>
+                <select
+                  value={selectedProvince}
+                  onChange={handleProvinceChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                >
+                  <option value="">Toutes les provinces</option>
+                  {getAvailableProvinces().map(province => (
+                    <option key={province._id} value={province.nom}>
+                      {province.nom}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Ville Filter */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Ville
+                </label>
+                <select
+                  value={selectedVille}
+                  onChange={handleVilleChange}
+                  disabled={!selectedProvince}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                >
+                  <option value="">Toutes les villes</option>
+                  {getAvailableVilles().map(ville => (
+                    <option key={ville._id} value={ville.nom}>
+                      {ville.nom}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Commune Filter */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Commune
+                </label>
+                <select
+                  value={selectedCommune}
+                  onChange={(e) => setSelectedCommune(e.target.value)}
+                  disabled={!selectedVille}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                >
+                  <option value="">Toutes les communes</option>
+                  {getAvailableCommunes().map(commune => (
+                    <option key={commune._id} value={commune.nom}>
+                      {commune.nom}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Active Location Filter Display */}
+            {hasLocationFilter && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {selectedProvince && (
+                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
+                    Province: {selectedProvince}
+                  </span>
+                )}
+                {selectedVille && (
+                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
+                    Ville: {selectedVille}
+                  </span>
+                )}
+                {selectedCommune && (
+                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
+                    Commune: {selectedCommune}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Stats */}
-        <div className="mt-4 flex items-center justify-between text-sm text-gray-600">
+        <div className="flex items-center justify-between text-sm text-gray-600 border-t pt-3">
           <span>
             {filteredListings.length} annonce(s) trouvée(s)
+            {pagination.total > 0 && filteredListings.length < listings.length && ` (filtrée sur ${listings.length})`}
+            {pagination.total > 0 && ` • Total: ${pagination.total}`}
           </span>
-          {pagination.total > 0 && (
+          {pagination.totalPages > 1 && (
             <span>
               Page {pagination.page} sur {pagination.totalPages}
             </span>
@@ -212,13 +424,27 @@ const FreeListingsPage = () => {
         </div>
       ) : filteredListings.length === 0 ? (
         <div className="bg-white rounded-lg shadow p-12 text-center">
-          <p className="text-gray-500">Aucune annonce trouvée</p>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="mt-4 text-blue-600 hover:text-blue-700 font-medium"
-          >
-            Créer votre première annonce gratuite
-          </button>
+          <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+            <MapPin className="h-12 w-12 text-gray-400" />
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">
+            Aucune annonce trouvée
+          </h3>
+          <p className="text-gray-500 mb-4">
+            {searchTerm || hasLocationFilter || filterStatus !== 'all'
+              ? 'Essayez de modifier vos filtres de recherche'
+              : 'Commencez par créer votre première annonce gratuite'
+            }
+          </p>
+          {!searchTerm && !hasLocationFilter && filterStatus === 'all' && (
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Plus className="h-5 w-5 mr-2" />
+              Créer une Annonce Gratuite
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -238,7 +464,14 @@ const FreeListingsPage = () => {
 
       {/* Pagination */}
       {pagination.totalPages > 1 && (
-        <div className="flex justify-center space-x-2">
+        <div className="flex justify-center items-center space-x-2">
+          <button
+            onClick={() => setPagination(prev => ({ ...prev, page: 1 }))}
+            disabled={pagination.page === 1}
+            className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+          >
+            Première
+          </button>
           <button
             onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
             disabled={pagination.page === 1}
@@ -246,7 +479,7 @@ const FreeListingsPage = () => {
           >
             Précédent
           </button>
-          <span className="px-4 py-2 text-gray-700">
+          <span className="px-4 py-2 text-gray-700 font-medium">
             Page {pagination.page} / {pagination.totalPages}
           </span>
           <button
@@ -256,6 +489,13 @@ const FreeListingsPage = () => {
           >
             Suivant
           </button>
+          <button
+            onClick={() => setPagination(prev => ({ ...prev, page: pagination.totalPages }))}
+            disabled={pagination.page >= pagination.totalPages}
+            className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+          >
+            Dernière
+          </button>
         </div>
       )}
 
@@ -264,7 +504,7 @@ const FreeListingsPage = () => {
         <CreateFreeListingModal
           onClose={() => setShowCreateModal(false)}
           onSuccess={handleListingCreated}
-          userRole={isAdmin() ? 'admin' : 'salesperson'}
+          userRole={isAdmin() ? 'admin' : isSalesPerson() ? 'salesperson' : 'user'}
         />
       )}
 
@@ -276,7 +516,7 @@ const FreeListingsPage = () => {
             setSelectedListing(null);
           }}
           onSuccess={handleListingActivated}
-          userRole={isAdmin() ? 'admin' : 'salesperson'}
+          userRole={isAdmin() ? 'admin' : isSalesPerson() ? 'salesperson' : 'user'}
         />
       )}
 

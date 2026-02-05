@@ -11,27 +11,41 @@ console.log('🔧 API Configuration:', {
   environment: process.env.NODE_ENV
 });
 
-// Instance Axios configurée
+// Instance Axios configurée - NO DEFAULT CONTENT-TYPE!
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
   timeout: API_TIMEOUT,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
-// ✅ Enhanced request interceptor with better token management
 apiClient.interceptors.request.use(
   (config) => {
     const startTime = Date.now();
     config.metadata = { startTime };
     
+    const isFormData = config.data instanceof FormData;
+    
     console.log('🚀 API Request:', {
       method: config.method?.toUpperCase(),
       url: config.url,
       fullUrl: config.baseURL + config.url,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      hasFiles: isFormData,
+      dataType: isFormData ? 'FormData' : typeof config.data
     });
+    
+    // ✅ CRITICAL: Smart Content-Type handling
+    if (isFormData) {
+      // For FormData, DON'T set Content-Type
+      // Browser will automatically set: multipart/form-data; boundary=...
+      console.log('📦 Uploading files - Content-Type will be auto-set by browser');
+      
+      // Remove Content-Type if it was accidentally set
+      delete config.headers['Content-Type'];
+    } else {
+      // For regular JSON requests
+      config.headers['Content-Type'] = 'application/json';
+      console.log('📝 Content-Type: application/json');
+    }
     
     // Token management with priority order
     const adminToken = localStorage.getItem('admin_token');

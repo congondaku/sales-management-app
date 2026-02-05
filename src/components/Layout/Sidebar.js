@@ -60,13 +60,13 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
           permission: null,
           description: 'Vue d\'ensemble de communes'
         },
-        {
-          id: 'annoces',
-          label: 'Annonces',
-          icon: Megaphone,
-          permission: null,
-          description: 'Vue d\'ensemble de communes'
-        },
+        // {
+        //   id: 'annoces',
+        //   label: 'Annonces',
+        //   icon: Megaphone,
+        //   permission: null,
+        //   description: 'Vue d\'ensemble de communes'
+        // },
         {
           id: 'traffic',
           label: 'Traffic',

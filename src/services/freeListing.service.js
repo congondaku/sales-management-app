@@ -6,7 +6,10 @@ class FreeListingService {
    */
   async createListing(listingData) {
     try {
-      const response = await api.post('/listings/add', listingData);
+      const response = await api.post('/listings/add', listingData, {
+        headers: {
+        }
+      });
       return response.data;
     } catch (error) {
       throw error.response?.data || error;
