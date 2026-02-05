@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "@congondaku/congo-ndaku-analytics": "github:congondaku/congo-ndaku-analytics#main",
-    "@congondaku/listings-management": "github:congondaku/listings-management#main",
+    "@congondaku/congo-ndaku-analytics": "git+https://${GITHUB_TOKEN}@github.com/congondaku/congo-ndaku-analytics.git#main",
+    "@congondaku/listings-management": "git+https://${GITHUB_TOKEN}@github.com/congondaku/listings-management.git#main",
     "@testing-library/jest-dom": "^5.16.4",
     "@testing-library/react": "^13.3.0",
     "@testing-library/user-event": "^13.5.0",
