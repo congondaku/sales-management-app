@@ -22,6 +22,7 @@ import SalesProfile from '../Sales/SalesProfile.js';
 import Communes from '../Sales/Communes.js'
 import { ListingsManagement } from '@congondaku/listings-management';
 import Home from '../Copied/lib/components/Home/Home.jsx'
+import FreeListingsPage from '../FreeListings/FreeListingsPage';
 
 
 
@@ -41,6 +42,10 @@ const MainLayout = () => {
         communes: {
           title: 'Communes',
           component: Communes
+        },
+        freelistings: {
+          title: 'Annonces Gratuites',
+          component: FreeListingsPage
         },
         annoces: {
           title: 'Annoces',
@@ -84,6 +89,10 @@ const MainLayout = () => {
         'communes': {
           title: 'Communes',
           component: Communes
+        },
+        'freelistings': {
+          title: 'Annonces Gratuites',
+          component: FreeListingsPage
         },
         'annoces': {
           title: 'Annoces',

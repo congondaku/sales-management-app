@@ -22,7 +22,8 @@ import {
   Network,
   Building,
   Megaphone,
-  TrendingUpDown
+  TrendingUpDown,
+  Gift
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { hasPermission } from '../../utils/permissions';
@@ -44,6 +45,13 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
           icon: Home,
           permission: null,
           description: 'Vue d\'ensemble des performances'
+        },
+        {
+          id: 'freelistings',
+          label: 'Annonces Gratuites',
+          icon: Gift,
+          permission: null,
+          description: 'Gérer les annonces gratuites'
         },
         {
           id: 'communes',
@@ -118,6 +126,13 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
           icon: Home,
           permission: null,
           description: 'Vue d\'ensemble de mes performances'
+        },
+        {
+          id: 'freelistings',
+          label: 'Annonces Gratuites',
+          icon: Gift,
+          permission: null,
+          description: 'Créer des annonces gratuites pour les clients'
         },
         {
           id: 'communes',
