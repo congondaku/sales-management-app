@@ -33,3 +33,4 @@ Thumbs.db
 # Ignored folders (custom)
 whatsapp_auth/
 coverage/
+.npmrc

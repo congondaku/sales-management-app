@@ -19,15 +19,12 @@ const LoginForm = () => {
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    // Nettoyer l'erreur du champ modifié
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: null }));
     }
-    // Nettoyer l'erreur serveur
     if (serverError) {
       setServerError('');
     }
-    // Clear success message
     if (loginSuccess) {
       setLoginSuccess(null);
     }
@@ -39,7 +36,6 @@ const LoginForm = () => {
     setServerError('');
     setLoginSuccess(null);
 
-    // Validation côté client
     const validation = validateLoginForm(formData);
     if (!validation.isValid) {
       setErrors(validation.errors);
@@ -51,11 +47,8 @@ const LoginForm = () => {
       const result = await login(formData.email, formData.password);
       
       if (result.success) {
-        // ✅ NEW: Show success message based on user type
         const userTypeText = result.userType === 'admin' ? 'Administrateur' : 'Commercial';
         setLoginSuccess(`Connexion réussie en tant que ${userTypeText}`);
-        
-        // The auth context will handle the redirect automatically
       } else {
         setServerError(result.message || 'Erreur de connexion');
       }
@@ -67,8 +60,19 @@ const LoginForm = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-900 via-purple-900 to-indigo-900 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md animate-fade-in">
+    <div 
+      className="min-h-screen flex items-center justify-center p-4 relative"
+      style={{
+        backgroundImage: 'url(https://res.cloudinary.com/dsyohqesy/image/upload/v1748413363/icon_ezxwz1.png)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      }}
+    >
+      {/* Overlay for better readability */}
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>
+      
+      <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl p-8 w-full max-w-md animate-fade-in relative z-10">
         
         {/* En-tête */}
         <div className="text-center mb-8">
@@ -82,7 +86,7 @@ const LoginForm = () => {
             Système de Gestion des Ventes
           </p>
           
-          {/* ✅ NEW: User type indicators */}
+          {/* User type indicators */}
           <div className="flex justify-center space-x-4 mt-4">
             <div className="flex items-center text-sm text-gray-500">
               <Building className="h-4 w-4 mr-1" />
@@ -146,8 +150,8 @@ const LoginForm = () => {
                 disabled={isLoading}
                 autoComplete="current-password"
                 style={{ 
-                  color: '#111827', // Ensure dark text
-                  backgroundColor: '#ffffff' // Ensure white background
+                  color: '#111827',
+                  backgroundColor: '#ffffff'
                 }}
               />
               <button
@@ -164,7 +168,7 @@ const LoginForm = () => {
             )}
           </div>
 
-          {/* ✅ NEW: Success message */}
+          {/* Success message */}
           {loginSuccess && (
             <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-green-800 text-sm flex items-center">
               <Shield className="h-4 w-4 mr-2" />
@@ -196,7 +200,7 @@ const LoginForm = () => {
           </button>
         </form>
 
-        {/* ✅ NEW: Info box */}
+        {/* Info box */}
         <div className="mt-4 p-4 bg-blue-50 rounded-lg">
           <p className="text-xs text-blue-800 text-center font-medium">
             💡 Utilisez vos identifiants admin ou commercial
