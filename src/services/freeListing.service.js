@@ -1,9 +1,6 @@
 import api from './api';
 
 class FreeListingService {
-  /**
-   * Create a new listing (Step 1)
-   */
   async createListing(listingData) {
     try {
       const response = await api.post('/listings/add', listingData, {
@@ -16,9 +13,6 @@ class FreeListingService {
     }
   }
 
-  /**
-   * Activate free listing (Step 2 - Admin)
-   */
   async activateFreeListing(listingId, duration, unit) {
     try {
       const response = await api.post('/free-listings/admin', {
