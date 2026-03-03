@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, Search, Filter, RefreshCw, MapPin, X } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import freeListingService from '../../services/freeListing.service';
@@ -9,22 +9,30 @@ import EditFreeListingModal from './EditFreeListingModal';
 import FreeListingCard from './FreeListingCard';
 import Toast from '../Commons/Toast';
 
+// Debounce hook — waits for user to stop typing before firing search
+const useDebounce = (value, delay = 400) => {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+  return debounced;
+};
+
 const FreeListingsPage = () => {
   const { user, isAdmin, isSalesPerson } = useAuth();
-  
-  // State
+
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadingLocations, setLoadingLocations] = useState(true);
   const [administrativeDivisions, setAdministrativeDivisions] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all'); // all, unpaid, active
-  
-  // Location filters
+  const [filterStatus, setFilterStatus] = useState('all');
+
   const [selectedProvince, setSelectedProvince] = useState('');
   const [selectedVille, setSelectedVille] = useState('');
   const [selectedCommune, setSelectedCommune] = useState('');
-  
+
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showActivateModal, setShowActivateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -34,21 +42,21 @@ const FreeListingsPage = () => {
     page: 1,
     limit: 50,
     total: 0,
-    totalPages: 0
+    totalPages: 0,
   });
 
-  // Fetch administrative divisions
+  // Debounced search — waits 400ms after user stops typing
+  const debouncedSearch = useDebounce(searchTerm, 400);
+
+  // ── Fetch administrative divisions ──────────────────────────
   useEffect(() => {
     const fetchAdministrativeDivisions = async () => {
       setLoadingLocations(true);
       try {
         const response = await freeListingService.getAdministrativeDivisions();
-        console.log('📍 Administrative divisions loaded:', response);
-
         const divisions = response.data || response;
         setAdministrativeDivisions(Array.isArray(divisions) ? divisions : []);
       } catch (error) {
-        console.error('Error fetching administrative divisions:', error);
         showToast('Erreur lors du chargement des provinces', 'error');
       } finally {
         setLoadingLocations(false);
@@ -57,35 +65,41 @@ const FreeListingsPage = () => {
     fetchAdministrativeDivisions();
   }, []);
 
-  // Fetch listings
-  const fetchListings = async () => {
+  // ── Fetch listings — server-side search + filters ────────────
+  const fetchListings = useCallback(async (resetPage = false) => {
     setLoading(true);
+    const page = resetPage ? 1 : pagination.page;
+
     try {
       let response;
-      
+
       if (filterStatus === 'unpaid') {
-        response = await freeListingService.getUnpaidListings(
-          pagination.page,
-          pagination.limit
-        );
+        response = await freeListingService.getUnpaidListings(page, pagination.limit);
         setListings(response.listings || []);
         setPagination(prev => ({
           ...prev,
+          page,
           total: response.pagination?.total || 0,
-          totalPages: response.pagination?.totalPages || 0
+          totalPages: response.pagination?.totalPages || 0,
         }));
       } else {
         response = await freeListingService.getAllListings({
-          page: pagination.page,
+          page,
           limit: pagination.limit,
-          status: filterStatus === 'active' ? 'available' : undefined
+          status: filterStatus === 'active' ? 'available' : undefined,
+          // ✅ Pass search and location filters to the backend
+          search:   debouncedSearch || undefined,
+          province: selectedProvince || undefined,
+          ville:    selectedVille    || undefined,
+          commune:  selectedCommune  || undefined,
         });
         setListings(response.listings || []);
         if (response.pagination) {
           setPagination(prev => ({
             ...prev,
+            page,
             total: response.pagination.total || 0,
-            totalPages: response.pagination.totalPages || 0
+            totalPages: response.pagination.totalPages || 0,
           }));
         }
       }
@@ -95,146 +109,101 @@ const FreeListingsPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [
+    pagination.page,
+    pagination.limit,
+    filterStatus,
+    debouncedSearch,
+    selectedProvince,
+    selectedVille,
+    selectedCommune,
+  ]);
 
+  // Re-fetch when any filter or page changes
   useEffect(() => {
     fetchListings();
-  }, [pagination.page, filterStatus]);
+  }, [fetchListings]);
 
-  // Get available provinces
-  const getAvailableProvinces = () => {
-    return administrativeDivisions.filter(prov => prov.isActive);
-  };
+  // Reset to page 1 whenever filters/search change
+  useEffect(() => {
+    setPagination(prev => ({ ...prev, page: 1 }));
+  }, [debouncedSearch, filterStatus, selectedProvince, selectedVille, selectedCommune]);
 
-  // Get available villes for selected province
+  // ── Location helpers ─────────────────────────────────────────
+  const getAvailableProvinces = () =>
+    administrativeDivisions.filter(p => p.isActive);
+
   const getAvailableVilles = () => {
     if (!selectedProvince) return [];
-
-    const province = administrativeDivisions.find(
-      prov => prov.nom === selectedProvince
-    );
-
-    return province?.villes?.filter(ville => ville.isActive) || [];
+    const province = administrativeDivisions.find(p => p.nom === selectedProvince);
+    return province?.villes?.filter(v => v.isActive) || [];
   };
 
-  // Get available communes for selected ville
   const getAvailableCommunes = () => {
     if (!selectedProvince || !selectedVille) return [];
-
-    const province = administrativeDivisions.find(
-      prov => prov.nom === selectedProvince
-    );
-
-    const ville = province?.villes?.find(
-      v => v.nom === selectedVille
-    );
-
-    return ville?.communes?.filter(commune => commune.isActive) || [];
+    const province = administrativeDivisions.find(p => p.nom === selectedProvince);
+    const ville = province?.villes?.find(v => v.nom === selectedVille);
+    return ville?.communes?.filter(c => c.isActive) || [];
   };
 
-  // Handle province change
   const handleProvinceChange = (e) => {
-    const province = e.target.value;
-    setSelectedProvince(province);
+    setSelectedProvince(e.target.value);
     setSelectedVille('');
     setSelectedCommune('');
   };
 
-  // Handle ville change
   const handleVilleChange = (e) => {
-    const ville = e.target.value;
-    setSelectedVille(ville);
+    setSelectedVille(e.target.value);
     setSelectedCommune('');
   };
 
-  // Clear all location filters
   const clearLocationFilters = () => {
     setSelectedProvince('');
     setSelectedVille('');
     setSelectedCommune('');
   };
 
-  // Toast helper
+  // ── Toast ────────────────────────────────────────────────────
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
   };
 
-  // Handle create listing success
-  const handleListingCreated = (listing) => {
+  // ── Handlers ─────────────────────────────────────────────────
+  const handleListingCreated = () => {
     setShowCreateModal(false);
-    fetchListings();
+    fetchListings(true);
     showToast('Annonce créée et activée avec succès!', 'success');
   };
 
-  // Handle activate listing success
   const handleListingActivated = () => {
     setShowActivateModal(false);
     setSelectedListing(null);
-    fetchListings();
+    fetchListings(true);
     showToast('Annonce activée avec succès!', 'success');
   };
 
-  // Handle edit listing
   const handleEditListing = (listing) => {
     setSelectedListing(listing);
     setShowEditModal(true);
   };
 
-  // Handle activate existing listing
   const handleActivateListing = (listing) => {
     setSelectedListing(listing);
     setShowActivateModal(true);
   };
 
-  // Handle delete listing
   const handleDeleteListing = async (listingId) => {
-    if (!window.confirm('Êtes-vous sûr de vouloir supprimer cette annonce?')) {
-      return;
-    }
-
+    if (!window.confirm('Êtes-vous sûr de vouloir supprimer cette annonce?')) return;
     try {
       await freeListingService.deleteListing(listingId);
-      fetchListings();
+      fetchListings(true);
       showToast('Annonce supprimée avec succès', 'success');
     } catch (error) {
       showToast('Erreur lors de la suppression', 'error');
-      console.error('Error deleting listing:', error);
     }
   };
 
-  // Filter listings by all criteria
-  const filteredListings = listings.filter(listing => {
-    // Search term filter
-    if (searchTerm) {
-      const searchLower = searchTerm.toLowerCase();
-      const matchesSearch = (
-        listing.title?.toLowerCase().includes(searchLower) ||
-        listing.address?.toLowerCase().includes(searchLower) ||
-        listing.commune?.toLowerCase().includes(searchLower) ||
-        listing.ville?.toLowerCase().includes(searchLower) ||
-        listing.province?.toLowerCase().includes(searchLower) ||
-        listing.listerFirstName?.toLowerCase().includes(searchLower) ||
-        listing.listerLastName?.toLowerCase().includes(searchLower)
-      );
-      if (!matchesSearch) return false;
-    }
-
-    // Location filters
-    if (selectedProvince && listing.province !== selectedProvince) {
-      return false;
-    }
-    if (selectedVille && listing.ville !== selectedVille) {
-      return false;
-    }
-    if (selectedCommune && listing.commune !== selectedCommune) {
-      return false;
-    }
-
-    return true;
-  });
-
-  // Check if any location filter is active
   const hasLocationFilter = selectedProvince || selectedVille || selectedCommune;
 
   return (
@@ -242,14 +211,9 @@ const FreeListingsPage = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            Annonces Gratuites
-          </h1>
-          <p className="text-sm text-gray-600 mt-1">
-            Gérez les annonces gratuites pour les clients
-          </p>
+          <h1 className="text-2xl font-bold text-gray-900">Annonces Gratuites</h1>
+          <p className="text-sm text-gray-600 mt-1">Gérez les annonces gratuites pour les clients</p>
         </div>
-        
         <button
           onClick={() => setShowCreateModal(true)}
           className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -259,9 +223,8 @@ const FreeListingsPage = () => {
         </button>
       </div>
 
-      {/* Filters and Search */}
+      {/* Filters */}
       <div className="bg-white rounded-lg shadow p-4 space-y-4">
-        {/* Top Row - Search and Status */}
         <div className="flex flex-col sm:flex-row gap-4">
           {/* Search */}
           <div className="flex-1">
@@ -269,11 +232,19 @@ const FreeListingsPage = () => {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
               <input
                 type="text"
-                placeholder="Rechercher par titre, adresse, commune, nom..."
+                placeholder="Nom, email, téléphone, titre, adresse, prix, type..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
             </div>
           </div>
 
@@ -293,7 +264,7 @@ const FreeListingsPage = () => {
 
           {/* Refresh */}
           <button
-            onClick={fetchListings}
+            onClick={() => fetchListings(true)}
             disabled={loading}
             className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
           >
@@ -301,7 +272,7 @@ const FreeListingsPage = () => {
           </button>
         </div>
 
-        {/* Location Filters Row */}
+        {/* Location Filters */}
         {!loadingLocations && (
           <div className="border-t pt-4">
             <div className="flex items-center gap-2 mb-3">
@@ -317,69 +288,50 @@ const FreeListingsPage = () => {
                 </button>
               )}
             </div>
-            
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Province Filter */}
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Province
-                </label>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Province</label>
                 <select
                   value={selectedProvince}
                   onChange={handleProvinceChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
                 >
                   <option value="">Toutes les provinces</option>
-                  {getAvailableProvinces().map(province => (
-                    <option key={province._id} value={province.nom}>
-                      {province.nom}
-                    </option>
+                  {getAvailableProvinces().map(p => (
+                    <option key={p._id} value={p.nom}>{p.nom}</option>
                   ))}
                 </select>
               </div>
-
-              {/* Ville Filter */}
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Ville
-                </label>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Ville</label>
                 <select
                   value={selectedVille}
                   onChange={handleVilleChange}
                   disabled={!selectedProvince}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
                 >
                   <option value="">Toutes les villes</option>
-                  {getAvailableVilles().map(ville => (
-                    <option key={ville._id} value={ville.nom}>
-                      {ville.nom}
-                    </option>
+                  {getAvailableVilles().map(v => (
+                    <option key={v._id} value={v.nom}>{v.nom}</option>
                   ))}
                 </select>
               </div>
-
-              {/* Commune Filter */}
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Commune
-                </label>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Commune</label>
                 <select
                   value={selectedCommune}
                   onChange={(e) => setSelectedCommune(e.target.value)}
                   disabled={!selectedVille}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
                 >
                   <option value="">Toutes les communes</option>
-                  {getAvailableCommunes().map(commune => (
-                    <option key={commune._id} value={commune.nom}>
-                      {commune.nom}
-                    </option>
+                  {getAvailableCommunes().map(c => (
+                    <option key={c._id} value={c.nom}>{c.nom}</option>
                   ))}
                 </select>
               </div>
             </div>
 
-            {/* Active Location Filter Display */}
             {hasLocationFilter && (
               <div className="mt-3 flex flex-wrap gap-2">
                 {selectedProvince && (
@@ -405,14 +357,13 @@ const FreeListingsPage = () => {
         {/* Stats */}
         <div className="flex items-center justify-between text-sm text-gray-600 border-t pt-3">
           <span>
-            {filteredListings.length} annonce(s) trouvée(s)
-            {pagination.total > 0 && filteredListings.length < listings.length && ` (filtrée sur ${listings.length})`}
-            {pagination.total > 0 && ` • Total: ${pagination.total}`}
+            {pagination.total > 0
+              ? `${listings.length} annonce(s) affichée(s) • Total: ${pagination.total}`
+              : 'Aucune annonce trouvée'}
+            {debouncedSearch && ` pour "${debouncedSearch}"`}
           </span>
           {pagination.totalPages > 1 && (
-            <span>
-              Page {pagination.page} sur {pagination.totalPages}
-            </span>
+            <span>Page {pagination.page} sur {pagination.totalPages}</span>
           )}
         </div>
       </div>
@@ -422,19 +373,16 @@ const FreeListingsPage = () => {
         <div className="flex justify-center py-12">
           <LoadingSpinner />
         </div>
-      ) : filteredListings.length === 0 ? (
+      ) : listings.length === 0 ? (
         <div className="bg-white rounded-lg shadow p-12 text-center">
           <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
             <MapPin className="h-12 w-12 text-gray-400" />
           </div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
-            Aucune annonce trouvée
-          </h3>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Aucune annonce trouvée</h3>
           <p className="text-gray-500 mb-4">
             {searchTerm || hasLocationFilter || filterStatus !== 'all'
               ? 'Essayez de modifier vos filtres de recherche'
-              : 'Commencez par créer votre première annonce gratuite'
-            }
+              : 'Commencez par créer votre première annonce gratuite'}
           </p>
           {!searchTerm && !hasLocationFilter && filterStatus === 'all' && (
             <button
@@ -448,7 +396,7 @@ const FreeListingsPage = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredListings.map((listing) => (
+          {listings.map((listing) => (
             <FreeListingCard
               key={listing._id}
               listing={listing}
@@ -507,42 +455,29 @@ const FreeListingsPage = () => {
           userRole={isAdmin() ? 'admin' : isSalesPerson() ? 'salesperson' : 'user'}
         />
       )}
-
       {showActivateModal && selectedListing && (
         <ActivateFreeListingModal
           listing={selectedListing}
-          onClose={() => {
-            setShowActivateModal(false);
-            setSelectedListing(null);
-          }}
+          onClose={() => { setShowActivateModal(false); setSelectedListing(null); }}
           onSuccess={handleListingActivated}
           userRole={isAdmin() ? 'admin' : isSalesPerson() ? 'salesperson' : 'user'}
         />
       )}
-
       {showEditModal && selectedListing && (
         <EditFreeListingModal
           listing={selectedListing}
-          onClose={() => {
-            setShowEditModal(false);
-            setSelectedListing(null);
-          }}
+          onClose={() => { setShowEditModal(false); setSelectedListing(null); }}
           onSuccess={() => {
             setShowEditModal(false);
             setSelectedListing(null);
-            fetchListings();
+            fetchListings(true);
             showToast('Annonce mise à jour avec succès', 'success');
           }}
         />
       )}
 
-      {/* Toast */}
       {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
-        />
+        <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />
       )}
     </div>
   );
