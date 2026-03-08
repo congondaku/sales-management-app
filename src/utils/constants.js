@@ -8,7 +8,7 @@ export const APP_CONFIG = {
 
 // ✅ FIXED: Force the deployed URL instead of relying on environment variables
 export const API_CONFIG = {
-  BASE_URL: 'https://evn92jcmry.us-east-1.awsapprunner.com/api', // Hardcoded deployed URL
+  BASE_URL: 'https://pwz852vu2e.us-east-1.awsapprunner.com/api', // Hardcoded deployed URL
   FALLBACK_URL: 'http://localhost:5002/api', // Keep as fallback for development
   TIMEOUT: 10000,
   RETRY_ATTEMPTS: 3,

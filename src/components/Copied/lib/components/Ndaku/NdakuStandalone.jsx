@@ -4,7 +4,7 @@ import { Last24 } from "../Last24/Last24";
 import { Last10 } from "../Last10/Last10";
 import { Activities } from "../Activites/Activities";
 
-const ndakuApi = "https://evn92jcmry.us-east-1.awsapprunner.com";
+const ndakuApi = "https://pwz852vu2e.us-east-1.awsapprunner.com";
 
 const NdakuStandalone = () => {
   const [realtimeStats, setRealtimeStats] = useState(null);

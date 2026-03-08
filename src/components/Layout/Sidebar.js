@@ -23,7 +23,8 @@ import {
   Building,
   Megaphone,
   TrendingUpDown,
-  Gift
+  Gift,
+  ClipboardCheck,   // ← NEW
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { hasPermission } from '../../utils/permissions';
@@ -34,10 +35,8 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
   const { user, logout, userType, isAdmin, isSalesPerson } = useAuth();
   const [showPermissionDetails, setShowPermissionDetails] = useState(false);
 
-  // ✅ ENHANCED: Different menu items based on user type
   const getMenuItems = () => {
     if (isAdmin()) {
-      // Admin menu items (enhanced with Organization Chart)
       return [
         {
           id: 'dashboard',
@@ -60,19 +59,19 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
           permission: null,
           description: 'Vue d\'ensemble de communes'
         },
-        // {
-        //   id: 'annoces',
-        //   label: 'Annonces',
-        //   icon: Megaphone,
-        //   permission: null,
-        //   description: 'Vue d\'ensemble de communes'
-        // },
         {
           id: 'traffic',
           label: 'Traffic',
           icon: TrendingUp,
           permission: null,
           description: 'Performance du site'
+        },
+        {
+          id: 'hotel-kyc',                   // ← NEW
+          label: 'KYC Hôtels',
+          icon: ClipboardCheck,
+          permission: null,
+          description: 'Vérification des dossiers hôteliers'
         },
         {
           id: 'sales-people',
@@ -118,7 +117,6 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
         }
       ];
     } else if (isSalesPerson()) {
-      // Sales person menu items (simplified but with org chart access)
       return [
         {
           id: 'sales-dashboard',
@@ -149,11 +147,11 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
           description: 'Performance du site'
         },
         {
-          id: 'analytics',
-          label: 'Analyses',
-          icon: BarChart3,
-          permission: 'canViewAnalytics',
-          description: 'Rapports et statistiques détaillées'
+          id: 'hotel-kyc',                   // ← NEW
+          label: 'KYC Hôtels',
+          icon: ClipboardCheck,
+          permission: null,
+          description: 'Vérifier les dossiers KYC hôteliers'
         },
         {
           id: 'register-user',
@@ -162,13 +160,6 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
           permission: null,
           description: 'Enregistrer un nouveau client'
         },
-        // {
-        //   id: 'organization',
-        //   label: 'Organigramme',
-        //   icon: Network,
-        //   permission: null,
-        //   description: 'Structure de l\'organisation'
-        // },
         {
           id: 'my-users',
           label: 'Mes Utilisateurs',
@@ -176,13 +167,6 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
           permission: null,
           description: 'Utilisateurs que j\'ai enregistrés'
         },
-        // {
-        //   id: 'my-commissions',
-        //   label: 'Mes Commissions',
-        //   icon: DollarSign,
-        //   permission: null,
-        //   description: 'Mes commissions et gains'
-        // },
         {
           id: 'my-performance',
           label: 'Ma Performance',
@@ -204,21 +188,18 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
 
   const menuItems = getMenuItems();
 
-  // ✅ ENHANCED: Permission checking based on user type
   const checkPermission = (item) => {
     if (!item.permission) return true;
 
     if (isAdmin()) {
       return hasPermission(user, item.permission);
     } else if (isSalesPerson()) {
-      // Sales people have access to all their menu items
       return true;
     }
 
     return false;
   };
 
-  // Séparer les éléments visibles et non visibles
   const visibleMenuItems = menuItems.filter(checkPermission);
   const hiddenMenuItems = menuItems.filter(item => !checkPermission(item));
 
@@ -226,7 +207,6 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
     logout();
   };
 
-  // ✅ ENHANCED: Permission stats based on user type
   const getPermissionStats = () => {
     if (isAdmin() && user?.permissions) {
       return {
@@ -234,9 +214,8 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
         granted: Object.values(user.permissions).filter(p => p === true).length
       };
     } else if (isSalesPerson()) {
-      // Sales people have basic permissions
       return {
-        total: 3, // canRegisterUsers, canViewOwnData, canEditProfile
+        total: 3,
         granted: 3
       };
     }
@@ -245,7 +224,6 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
 
   const permissionStats = getPermissionStats();
 
-  // ✅ ENHANCED: User role display
   const getRoleDisplay = () => {
     if (isAdmin()) {
       return user?.role === 'ceo' ? 'PDG' :
@@ -260,7 +238,6 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
     return 'Utilisateur';
   };
 
-  // ✅ ENHANCED: Header text based on user type
   const getHeaderInfo = () => {
     if (isAdmin()) {
       return {
@@ -281,14 +258,12 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
 
   const headerInfo = getHeaderInfo();
 
-  // ✅ NEW: Highlight organization chart as new feature
   const isNewFeature = (itemId) => {
     return itemId === 'organization';
   };
 
   return (
     <>
-      {/* Overlay pour mobile */}
       {isSidebarOpen && (
         <div
           className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
@@ -296,13 +271,11 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
         />
       )}
 
-      {/* Sidebar */}
       <div className={`
         fixed top-0 left-0 h-full w-64 bg-gray-900 text-white transform transition-transform duration-300 ease-in-out z-50 flex flex-col
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0
       `}>
 
-        {/* ✅ ENHANCED: Header with user type indication */}
         <div className="p-6 border-b border-gray-700 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
@@ -323,7 +296,6 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
           </div>
         </div>
 
-        {/* ✅ ENHANCED: User profile with user type indicator */}
         <div className="p-4 border-b border-gray-700 flex-shrink-0">
           <div className="flex items-center space-x-3">
             <div className={`w-10 h-10 ${isSalesPerson() ? 'bg-green-600' : 'bg-blue-600'} rounded-full flex items-center justify-center`}>
@@ -347,7 +319,6 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
           </div>
         </div>
 
-        {/* ✅ ENHANCED: Permission stats (simplified for sales people) */}
         <div className="p-4 border-b border-gray-700 flex-shrink-0">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs text-gray-400">
@@ -366,7 +337,7 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
           <div className="flex items-center space-x-2">
             <div className="flex-1 bg-gray-700 rounded-full h-2">
               <div
-                className={`${isSalesPerson() ? 'bg-green-500' : 'bg-green-500'} h-2 rounded-full transition-all duration-300`}
+                className="bg-green-500 h-2 rounded-full transition-all duration-300"
                 style={{ width: `${permissionStats.total > 0 ? (permissionStats.granted / permissionStats.total) * 100 : 0}%` }}
               ></div>
             </div>
@@ -376,7 +347,6 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
           </div>
         </div>
 
-        {/* ✅ ENHANCED: Permission details (admin only) */}
         {showPermissionDetails && isAdmin() && (
           <div className="p-4 border-b border-gray-700 bg-gray-800 max-h-32 overflow-y-auto custom-scrollbar flex-shrink-0">
             <h4 className="text-xs font-medium text-gray-300 mb-2">Toutes les permissions:</h4>
@@ -397,7 +367,6 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
           </div>
         )}
 
-        {/* ✅ ENHANCED: Territory/Team info for sales people */}
         {isSalesPerson() && user?.territory && (
           <div className="p-4 border-b border-gray-700 flex-shrink-0">
             <div className="text-center">
@@ -410,9 +379,7 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
           </div>
         )}
 
-        {/* Menu de navigation */}
         <nav className="flex-1 p-4 overflow-y-auto custom-scrollbar min-h-0">
-          {/* Pages accessibles */}
           <div className="mb-6">
             <h3 className="text-xs font-medium text-gray-400 mb-3 uppercase tracking-wider">
               {isAdmin() ? 'Pages Accessibles' : 'Mon Espace'}
@@ -421,7 +388,6 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
               {visibleMenuItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = currentPage === item.id;
-                const isNew = isNewFeature(item.id);
 
                 return (
                   <li key={item.id}>
@@ -458,7 +424,6 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
             </ul>
           </div>
 
-          {/* ✅ ENHANCED: Hidden pages for admins only */}
           {isAdmin() && hiddenMenuItems.length > 0 && (
             <div className="mb-6">
               <h3 className="text-xs font-medium text-gray-400 mb-3 uppercase tracking-wider">
@@ -491,7 +456,6 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
           )}
         </nav>
 
-        {/* Bouton de déconnexion */}
         <div className="p-4 border-t border-gray-700 flex-shrink-0">
           <button
             onClick={handleLogout}

@@ -12,7 +12,7 @@ import UsersPage from '../Users/UsersPage';
 import PermissionsPage from '../Permissions/PermissionsPage';
 import SettingsPage from '../Settings/SettingsPage';
 
-// Sales Person Components (you'll need to create these)
+// Sales Person Components
 import SalesDashboard from '../Sales/SalesDashboard';
 import MyUsers from '../Sales/MyUsers';
 import MyCommissions from '../Sales/MyCommissions';
@@ -23,6 +23,7 @@ import Communes from '../Sales/Communes.js'
 import { ListingsManagement } from '@congondaku/listings-management';
 import Home from '../Copied/lib/components/Home/Home.jsx'
 import FreeListingsPage from '../FreeListings/FreeListingsPage';
+import HotelKYCPage from '../HotelKYC/HotelKYCPage'; // ← NEW
 
 
 
@@ -31,7 +32,6 @@ const MainLayout = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { userType, isAdmin, isSalesPerson } = useAuth();
 
-  // ✅ ENHANCED: Different page configurations based on user type
   const getPageConfigurations = () => {
     if (isAdmin()) {
       return {
@@ -78,7 +78,11 @@ const MainLayout = () => {
         settings: {
           title: 'Paramètres',
           component: SettingsPage
-        }
+        },
+        'hotel-kyc': {                        // ← NEW
+          title: 'KYC Hôtels',
+          component: HotelKYCPage
+        },
       };
     } else if (isSalesPerson()) {
       return {
@@ -121,7 +125,11 @@ const MainLayout = () => {
         'sales-profile': {
           title: 'Mon Profil',
           component: SalesProfile
-        }
+        },
+        'hotel-kyc': {                        // ← NEW
+          title: 'KYC Hôtels',
+          component: HotelKYCPage
+        },
       };
     }
     return {};
@@ -129,7 +137,6 @@ const MainLayout = () => {
 
   const pages = getPageConfigurations();
 
-  // ✅ ENHANCED: Set default page based on user type
   React.useEffect(() => {
     if (isSalesPerson() && currentPage === 'dashboard') {
       setCurrentPage('sales-dashboard');
@@ -138,7 +145,6 @@ const MainLayout = () => {
     }
   }, [userType, isAdmin, isSalesPerson, currentPage]);
 
-  // ✅ ENHANCED: Fallback handling
   const getCurrentPageConfig = () => {
     const pageConfig = pages[currentPage];
 
@@ -146,14 +152,6 @@ const MainLayout = () => {
       return pageConfig;
     }
 
-    // Fallback to appropriate default based on user type
-    // if (isSalesPerson()) {
-    //   return pages['sales-dashboard'] || { title: 'Dashboard', component: SalesDashboard };
-    // } else if (isAdmin()) {
-    //   return pages['dashboard'] || { title: 'Dashboard', component: Dashboard };
-    // }
-
-    // Ultimate fallback
     return {
       title: 'Page non trouvée',
       component: () => (
@@ -172,7 +170,6 @@ const MainLayout = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Sidebar */}
       <Sidebar
         currentPage={currentPage}
         setCurrentPage={setCurrentPage}
@@ -180,16 +177,13 @@ const MainLayout = () => {
         setIsSidebarOpen={setIsSidebarOpen}
       />
 
-      {/* Contenu principal */}
       <div className="lg:ml-64">
-        {/* Header */}
         <Header
           title={currentPageConfig.title}
           isSidebarOpen={isSidebarOpen}
           setIsSidebarOpen={setIsSidebarOpen}
         />
 
-        {/* Contenu de la page */}
         <main className="p-6">
           <React.Suspense
             fallback={
