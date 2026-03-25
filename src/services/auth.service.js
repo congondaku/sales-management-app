@@ -69,7 +69,7 @@ export const authService = {
   // ADMIN MANAGEMENT (FIXED ENDPOINTS)
   // ================================
 
-  // ✅ FIXED: Use correct endpoint for creating admin
+  // Create admin using correct endpoint
   async createAdmin(adminData) {
     try {
       const response = await apiClient.post('/permissions/admin/create', adminData);
@@ -79,7 +79,7 @@ export const authService = {
     }
   },
 
-  // ✅ FIXED: Get all admins from correct endpoint
+  // Get all admins from correct endpoint
   async getAllAdmins(params = {}) {
     try {
       const response = await apiClient.get('/admin/admins', { params });
@@ -89,7 +89,7 @@ export const authService = {
     }
   },
 
-  // ✅ FIXED: Suspend admin using correct endpoint
+  // Suspend admin using correct endpoint
   async suspendAdmin(adminId, reason = '') {
     try {
       const response = await apiClient.put(`/permissions/admin/${adminId}/suspend`, {
@@ -101,7 +101,7 @@ export const authService = {
     }
   },
 
-  // ✅ FIXED: Unsuspend admin using correct endpoint
+  // Unsuspend admin using correct endpoint
   async unsuspendAdmin(adminId) {
     try {
       const response = await apiClient.put(`/permissions/admin/${adminId}/unsuspend`);
@@ -145,7 +145,7 @@ export const authService = {
   // HIERARCHY MANAGEMENT (FIXED)
   // ================================
 
-  // ✅ FIXED: Use correct endpoint for hierarchy
+  // Use correct endpoint for hierarchy
   async getHierarchy() {
     try {
       const response = await apiClient.get('/permissions/hierarchy');
@@ -179,7 +179,7 @@ export const authService = {
     }
   },
 
-  // ✅ FIXED: Use correct endpoint for profile update
+  // Use correct endpoint for profile update
   async updateProfile(profileData) {
     try {
       const response = await apiClient.put('/admin/profile', profileData);
@@ -199,7 +199,7 @@ export const authService = {
   // DASHBOARD (FIXED)
   // ================================
 
-  // ✅ FIXED: Use correct endpoint for dashboard
+  // Use correct endpoint for dashboard
   async getDashboard(period = 'month') {
     try {
       const response = await apiClient.get('/admin/dashboard', {
@@ -215,7 +215,7 @@ export const authService = {
   // USER MANAGEMENT (FIXED)
   // ================================
 
-  // ✅ FIXED: Use correct endpoint for users
+  // Use correct endpoint for users
   async getAllUsers(params = {}) {
     try {
       const response = await apiClient.get('/admin/users', { params });
@@ -293,7 +293,7 @@ export const authService = {
     };
   },
 
-  // ✅ NEW: Valider les permissions
+  // Valider les permissions
   validatePermissions(permissions) {
     const errors = {};
     const validPermissions = [
@@ -347,7 +347,7 @@ export const authService = {
   },
 
   // ================================
-  // UTILITY METHODS
+  // UTILITY METHODS (ENHANCED)
   // ================================
 
   // Sauvegarder l'utilisateur et le token
@@ -378,11 +378,11 @@ export const authService = {
 
   // Vérifier si l'utilisateur actuel a une permission
   hasPermission(permission) {
-    const permissions = this.getCurrentUserPermissions();
     const user = this.getCurrentUser();
+    const permissions = this.getCurrentUserPermissions();
     
-    // CEO a toutes les permissions
-    if (user?.role === 'ceo') return true;
+    // CEO et Super Admin ont toutes les permissions
+    if (user?.role === 'ceo' || user?.role === 'super_admin') return true;
     
     return permissions[permission] === true;
   },
@@ -393,9 +393,20 @@ export const authService = {
     return user?.role || null;
   },
 
+  // Vérifier si l'utilisateur est CEO ou Super Admin
+  isFullAccess() {
+    const role = this.getCurrentUserRole();
+    return role === 'ceo' || role === 'super_admin';
+  },
+
   // Vérifier si l'utilisateur est CEO
   isCEO() {
     return this.getCurrentUserRole() === 'ceo';
+  },
+
+  // Vérifier si l'utilisateur est Super Admin
+  isSuperAdmin() {
+    return this.getCurrentUserRole() === 'super_admin';
   },
 
   // Vérifier si l'utilisateur peut gérer un autre utilisateur
@@ -403,8 +414,8 @@ export const authService = {
     const currentUser = this.getCurrentUser();
     if (!currentUser) return false;
     
-    // CEO peut gérer tout le monde
-    if (currentUser.role === 'ceo') return true;
+    // CEO et Super Admin peuvent gérer tout le monde
+    if (currentUser.role === 'ceo' || currentUser.role === 'super_admin') return true;
     
     // Ne peut pas se gérer soi-même (sauf pour le profil)
     if (targetUserId === currentUser.id) return false;
@@ -413,13 +424,13 @@ export const authService = {
     return this.hasPermission('canEditAdmins');
   },
 
-  // ✅ NEW: Obtenir le nom complet de l'utilisateur
+  // Obtenir le nom complet de l'utilisateur
   getCurrentUserFullName() {
     const user = this.getCurrentUser();
     return user ? `${user.firstName} ${user.lastName}` : '';
   },
 
-  // ✅ NEW: Obtenir les données d'affichage de l'utilisateur
+  // Obtenir les données d'affichage de l'utilisateur
   getCurrentUserDisplayData() {
     const user = this.getCurrentUser();
     if (!user) return null;
@@ -432,11 +443,27 @@ export const authService = {
       territory: user.territory,
       teamName: user.teamName,
       permissions: user.permissions || {},
-      isCEO: user.role === 'ceo'
+      isCEO: user.role === 'ceo',
+      isSuperAdmin: user.role === 'super_admin',
+      isFullAccess: user.role === 'ceo' || user.role === 'super_admin'
     };
   },
 
-  // ✅ NEW: Vérifier l'état de la session
+  // Obtenir le libellé du rôle
+  getRoleLabel(role = null) {
+    const userRole = role || this.getCurrentUserRole();
+    const roles = {
+      'ceo': 'PDG',
+      'super_admin': 'Super Administrateur',
+      'regional_manager': 'Directeur Régional',
+      'sales_manager': 'Directeur des Ventes',
+      'team_leader': 'Chef d\'Équipe',
+      'admin': 'Administrateur'
+    };
+    return roles[userRole] || userRole || 'Utilisateur';
+  },
+
+  // Vérifier l'état de la session
   async checkSession() {
     if (!this.isAuthenticated()) {
       return { valid: false, reason: 'No authentication data' };
@@ -450,14 +477,14 @@ export const authService = {
     }
   },
 
-  // ✅ NEW: Nettoyer toutes les données d'authentification
+  // Nettoyer toutes les données d'authentification
   clearAllAuthData() {
     console.log('🧹 Clearing all admin auth data');
     localStorage.removeItem('admin_token');
     localStorage.removeItem('admin_user');
   },
 
-  // ✅ NEW: Auto-refresh token avant expiration
+  // Auto-refresh token avant expiration
   setupTokenRefresh(tokenExpiryTime) {
     // Refresh token 5 minutes before expiry
     const refreshTime = tokenExpiryTime - (5 * 60 * 1000);
@@ -476,7 +503,7 @@ export const authService = {
     }
   },
 
-  // ✅ NEW: Obtenir les statistiques de session
+  // Obtenir les statistiques de session
   getSessionStats() {
     const user = this.getCurrentUser();
     const token = this.getToken();
@@ -489,8 +516,40 @@ export const authService = {
       loginTime: user.lastLogin || 'Unknown',
       territory: user.territory,
       permissionsCount: Object.keys(user.permissions || {}).length,
-      isCEO: this.isCEO()
+      isCEO: this.isCEO(),
+      isSuperAdmin: this.isSuperAdmin(),
+      isFullAccess: this.isFullAccess()
     };
+  },
+
+  // ✅ NEW: Vérifier si l'utilisateur peut accéder à une page
+  canAccessPage(pageId) {
+    const user = this.getCurrentUser();
+    if (!user) return false;
+    
+    // CEO et Super Admin ont accès à toutes les pages
+    if (user.role === 'ceo' || user.role === 'super_admin') return true;
+    
+    // Page-specific permissions logic
+    const pagePermissions = {
+      'sales-people': 'canViewAllSalesPeople',
+      'commissions': 'canViewCommissions',
+      'analytics': 'canViewAnalytics',
+      'users': 'canViewAllData',
+      'permissions': 'canManagePermissions',
+      'settings': 'canViewAllData',
+      'dashboard': null, // Dashboard accessible to all admins
+      'ads': null, // Ads accessible to all admins
+      'freelistings': null, // Free listings accessible to all admins
+      'hotel-kyc': null, // Hotel KYC accessible to all admins
+      'property-requests': null, // Property requests accessible to all admins
+      'communes': null // Communes accessible to all admins
+    };
+    
+    const requiredPermission = pagePermissions[pageId];
+    if (!requiredPermission) return true; // No permission required
+    
+    return this.hasPermission(requiredPermission);
   }
 };
 

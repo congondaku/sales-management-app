@@ -97,7 +97,7 @@ export const permissionService = {
   // ADMIN MANAGEMENT (FIXED ENDPOINTS)
   // ================================
 
-  // ✅ FIXED: Create admin using correct endpoint
+  // Create admin using correct endpoint
   async createAdmin(adminData) {
     try {
       const response = await apiClient.post('/permissions/admin/create', adminData);
@@ -107,7 +107,7 @@ export const permissionService = {
     }
   },
 
-  // ✅ FIXED: Suspend admin using correct endpoint
+  // Suspend admin using correct endpoint
   async suspendAdmin(adminId, reason = '') {
     try {
       const response = await apiClient.put(`/permissions/admin/${adminId}/suspend`, {
@@ -119,7 +119,7 @@ export const permissionService = {
     }
   },
 
-  // ✅ FIXED: Unsuspend admin using correct endpoint
+  // Unsuspend admin using correct endpoint
   async unsuspendAdmin(adminId) {
     try {
       const response = await apiClient.put(`/permissions/admin/${adminId}/unsuspend`);
@@ -129,7 +129,7 @@ export const permissionService = {
     }
   },
 
-  // ✅ FIXED: Assign manager to admin using correct endpoint
+  // Assign manager to admin using correct endpoint
   async assignManagerToAdmin(adminId, managerId) {
     try {
       const response = await apiClient.put(`/permissions/admin/${adminId}/assign-manager`, {
@@ -145,7 +145,7 @@ export const permissionService = {
   // SALES PERSON MANAGEMENT (FIXED ENDPOINTS)
   // ================================
 
-  // ✅ FIXED: Suspend sales person using correct endpoint
+  // Suspend sales person using correct endpoint
   async suspendSalesPerson(salesPersonId, reason = '') {
     try {
       const response = await apiClient.put(`/permissions/sales-person/${salesPersonId}/suspend`, {
@@ -157,7 +157,7 @@ export const permissionService = {
     }
   },
 
-  // ✅ FIXED: Unsuspend sales person using correct endpoint
+  // Unsuspend sales person using correct endpoint
   async unsuspendSalesPerson(salesPersonId) {
     try {
       const response = await apiClient.put(`/permissions/sales-person/${salesPersonId}/unsuspend`);
@@ -167,7 +167,7 @@ export const permissionService = {
     }
   },
 
-  // ✅ FIXED: Set commission rate using correct endpoint (CEO only)
+  // Set commission rate using correct endpoint (CEO/Super Admin only)
   async setCommissionRate(salesPersonId, commissionRate) {
     try {
       const response = await apiClient.put(`/permissions/sales-person/${salesPersonId}/set-commission-rate`, {
@@ -179,7 +179,7 @@ export const permissionService = {
     }
   },
 
-  // ✅ FIXED: Assign manager to sales person using correct endpoint
+  // Assign manager to sales person using correct endpoint
   async assignManagerToSalesPerson(salesPersonId, managerId) {
     try {
       const response = await apiClient.put(`/permissions/sales-person/${salesPersonId}/assign-manager`, {
@@ -205,7 +205,7 @@ export const permissionService = {
     }
   },
 
-  // ✅ FIXED: Get manageable users using correct endpoint
+  // Get manageable users using correct endpoint
   async getManageableUsers(type = 'all') {
     try {
       const response = await apiClient.get('/permissions/manageable-users', {
@@ -334,10 +334,10 @@ export const permissionService = {
   },
 
   // ================================
-  // NEW: ENHANCED ADMIN OPERATIONS
+  // ENHANCED ADMIN OPERATIONS (with Super Admin support)
   // ================================
 
-  // ✅ NEW: Get admin details with hierarchy
+  // Get admin details with hierarchy
   async getAdminDetails(adminId) {
     try {
       const [permissionsResponse, hierarchyResponse] = await Promise.all([
@@ -349,7 +349,8 @@ export const permissionService = {
         success: true,
         admin: {
           permissions: permissionsResponse.permissions || {},
-          hierarchy: hierarchyResponse.hierarchy || null
+          hierarchy: hierarchyResponse.hierarchy || null,
+          isSuperAdmin: permissionsResponse.role === 'super_admin' || permissionsResponse.role === 'ceo'
         }
       };
     } catch (error) {
@@ -357,24 +358,32 @@ export const permissionService = {
     }
   },
 
-  // ✅ NEW: Get permission statistics
+  // Get permission statistics with Super Admin awareness
   async getPermissionStats() {
     try {
-      const [availableResponse, myPermissionsResponse] = await Promise.all([
+      const [availableResponse, myPermissionsResponse, userInfoResponse] = await Promise.all([
         this.getAvailablePermissions(),
-        this.getMyPermissions()
+        this.getMyPermissions(),
+        apiClient.get('/permissions/my-info')
       ]);
 
       const available = availableResponse.permissions || {};
       const myPermissions = myPermissionsResponse.permissions || {};
+      const userRole = userInfoResponse.data?.role;
+
+      const isFullAccess = userRole === 'ceo' || userRole === 'super_admin';
 
       const stats = {
         totalAvailable: Object.keys(available).reduce((count, category) => {
           return count + (available[category]?.length || 0);
         }, 0),
-        myGranted: Object.values(myPermissions).filter(p => p === true).length,
+        myGranted: isFullAccess 
+          ? Object.keys(myPermissions).length 
+          : Object.values(myPermissions).filter(p => p === true).length,
         myTotal: Object.keys(myPermissions).length,
-        categories: Object.keys(available).length
+        categories: Object.keys(available).length,
+        isFullAccess,
+        userRole
       };
 
       return {
@@ -390,7 +399,7 @@ export const permissionService = {
     }
   },
 
-  // ✅ NEW: Bulk permission management
+  // Bulk permission management
   async bulkPermissionUpdate(operations) {
     try {
       const results = [];
@@ -443,17 +452,31 @@ export const permissionService = {
     }
   },
 
-  // ✅ NEW: Check if current user can perform action
+  // Check if current user can perform action (with Super Admin support)
   async canPerformAction(action, targetId, targetType) {
     try {
+      const userInfoResponse = await apiClient.get('/permissions/my-info');
+      const userRole = userInfoResponse.data?.role;
       const myPermissions = await this.getMyPermissions();
       
+      // Super Admin and CEO can perform all actions
+      if (userRole === 'ceo' || userRole === 'super_admin') {
+        return {
+          canPerform: true,
+          reason: null,
+          isFullAccess: true
+        };
+      }
+
       const requiredPermissions = {
         'suspend_admin': ['canEditAdmins'],
         'create_admin': ['canCreateAdmins'],
         'manage_permissions': ['canManagePermissions'],
         'set_commission_rate': ['canSetCommissionRates'],
-        'suspend_sales_person': ['canEditSalesPeople']
+        'suspend_sales_person': ['canEditSalesPeople'],
+        'view_commissions': ['canViewCommissions'],
+        'view_analytics': ['canViewAnalytics'],
+        'edit_sales_person': ['canEditSalesPeople']
       };
 
       const required = requiredPermissions[action];
@@ -465,7 +488,8 @@ export const permissionService = {
 
       return {
         canPerform: hasPermission,
-        reason: hasPermission ? null : `Permission requise: ${required.join(' ou ')}`
+        reason: hasPermission ? null : `Permission requise: ${required.join(' ou ')}`,
+        isFullAccess: false
       };
     } catch (error) {
       return {
@@ -475,21 +499,93 @@ export const permissionService = {
     }
   },
 
-  // ✅ NEW: Get user hierarchy path
+  // Get user hierarchy path with Super Admin support
   async getUserHierarchyPath(userId, userType) {
     try {
-      const hierarchy = await this.getHierarchy();
+      const [hierarchy, userInfo] = await Promise.all([
+        this.getHierarchy(),
+        apiClient.get(`/permissions/user/${userId}/info`)
+      ]);
+
+      const userRole = userInfo.data?.role;
+      const isFullAccess = userRole === 'ceo' || userRole === 'super_admin';
       
-      // This would need to traverse the hierarchy to build the path
-      // For now, return basic info
+      // For full access users, they are at the top of hierarchy
+      if (isFullAccess) {
+        return {
+          success: true,
+          path: [],
+          isTopLevel: true,
+          directManager: null,
+          subordinates: hierarchy.subordinates || { admins: [], salesPeople: [] }
+        };
+      }
+      
       return {
         success: true,
         path: [], // Would contain hierarchy path from root to user
+        isTopLevel: false,
         directManager: hierarchy.admin?.managedBy || null,
         subordinates: hierarchy.subordinates || { admins: [], salesPeople: [] }
       };
     } catch (error) {
       throw new Error(error.response?.data?.message || 'Erreur lors du chargement du chemin hiérarchique');
+    }
+  },
+
+  // ================================
+  // SUPER ADMIN SPECIFIC METHODS
+  // ================================
+
+  // Promote admin to Super Admin (CEO only)
+  async promoteToSuperAdmin(adminId, reason = '') {
+    try {
+      const response = await apiClient.put(`/permissions/admin/${adminId}/promote-to-super-admin`, {
+        reason
+      });
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Erreur lors de la promotion en Super Admin');
+    }
+  },
+
+  // Demote Super Admin to regular admin (CEO only)
+  async demoteFromSuperAdmin(adminId, reason = '') {
+    try {
+      const response = await apiClient.put(`/permissions/admin/${adminId}/demote-from-super-admin`, {
+        reason
+      });
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Erreur lors de la rétrogradation de Super Admin');
+    }
+  },
+
+  // Get all Super Admins
+  async getSuperAdmins() {
+    try {
+      const response = await apiClient.get('/permissions/super-admins');
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Erreur lors du chargement des Super Admins');
+    }
+  },
+
+  // Check if user is Super Admin or CEO
+  async isFullAccessUser() {
+    try {
+      const userInfoResponse = await apiClient.get('/permissions/my-info');
+      const userRole = userInfoResponse.data?.role;
+      return {
+        isFullAccess: userRole === 'ceo' || userRole === 'super_admin',
+        role: userRole
+      };
+    } catch (error) {
+      return {
+        isFullAccess: false,
+        role: null,
+        error: error.message
+      };
     }
   }
 };

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Filter, Eye, Edit, Trash2, UserPlus, MapPin, Target, Percent, UserX, UserCheck, DollarSign, Download, RefreshCw } from 'lucide-react';
+import { Plus, Search, Filter, Eye, Edit, Trash2, UserPlus, MapPin, Target, Percent, UserX, UserCheck, DollarSign, Download, RefreshCw, Star } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { salesService } from '../../services/sales.service';
 import { permissionService } from '../../services/permission.service';
@@ -25,7 +25,6 @@ const SalesPeoplePage = () => {
   const [filters, setFilters] = useState({
     territory: '',
     team: ''
-    // ✅ REMOVED: status filter - just show all their people
   });
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -42,6 +41,12 @@ const SalesPeoplePage = () => {
   const [exporting, setExporting] = useState(false);
 
   const { ConfirmDialogComponent, confirmDelete, confirmAction } = useConfirmDialog();
+
+  // Check if user has full access (CEO or Super Admin)
+  const hasFullAccess = user?.role === 'ceo' || user?.role === 'super_admin';
+  
+  // Check if user has permission to see commission rates
+  const canSeeCommissionRates = hasFullAccess || hasPermission(user, 'canSeeCommissionRates');
 
   const goToPage = (page) => {
     setCurrentPage(page);
@@ -79,7 +84,8 @@ const SalesPeoplePage = () => {
         console.log(`📊 Loaded ${response.salesPeople?.length || 0} sales people`, {
           adminRole: user?.role,
           adminEmail: user?.email,
-          canSeeAll: response.adminInfo?.canSeeAll
+          canSeeAll: response.adminInfo?.canSeeAll,
+          hasFullAccess
         });
       } else {
         console.error('Erreur:', response.message);
@@ -97,7 +103,7 @@ const SalesPeoplePage = () => {
 
   const loadPerformanceStats = async () => {
     try {
-      if (!hasPermission(user, 'canViewAnalytics')) {
+      if (!hasPermission(user, 'canViewAnalytics') && !hasFullAccess) {
         return;
       }
 
@@ -302,7 +308,7 @@ const SalesPeoplePage = () => {
 
   const clearFilters = () => {
     setSearchTerm('');
-    setFilters({ territory: '', team: '' }); // ✅ SIMPLIFIED: Just territory and team
+    setFilters({ territory: '', team: '' });
     goToPage(1);
   };
 
@@ -311,13 +317,15 @@ const SalesPeoplePage = () => {
     createColumn.selection({
       selectedRows,
       onSelectionChange: setSelectedRows,
-      disabled: (row) => !hasPermission(user, 'canEditSalesPeople')
+      disabled: (row) => !hasPermission(user, 'canEditSalesPeople') && !hasFullAccess
     }),
 
     createColumn.custom('name', 'Commercial', (_, row) => (
       <div className="flex items-center">
-        <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/20 rounded-full flex items-center justify-center relative">
-          <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
+        <div className={`w-10 h-10 rounded-full flex items-center justify-center relative ${
+          hasFullAccess ? 'bg-gradient-to-br from-purple-500 to-pink-600' : 'bg-blue-100 dark:bg-blue-900/20'
+        }`}>
+          <span className={`text-sm font-medium ${hasFullAccess ? 'text-white' : 'text-blue-600 dark:text-blue-400'}`}>
             {row.firstName?.[0]}{row.lastName?.[0]}
           </span>
           {row.isSuspended && (
@@ -388,7 +396,7 @@ const SalesPeoplePage = () => {
 
     createColumn.custom('commission', 'Commission', (_, row) => (
       <div>
-        {hasPermission(user, 'canSeeCommissionRates') ? (
+        {canSeeCommissionRates ? (
           <div>
             <div className="text-sm text-gray-900 dark:text-white">
               {row.commissionRate ? `${(row.commissionRate * 100).toFixed(1)}%` : 'Non défini'}
@@ -403,7 +411,6 @@ const SalesPeoplePage = () => {
       </div>
     )),
 
-    // ✅ UPDATED: Status column now shows comprehensive status
     createColumn.custom('status', 'Statut', (_, row) => {
       if (row.isSuspended) {
         return (
@@ -450,26 +457,26 @@ const SalesPeoplePage = () => {
         label: 'Modifier',
         icon: Edit,
         onClick: handleEdit,
-        disabled: (row) => !hasPermission(user, 'canEditSalesPeople') || row.isSuspended
+        disabled: (row) => !hasPermission(user, 'canEditSalesPeople') && !hasFullAccess || row.isSuspended
       },
       {
         label: 'Définir taux commission',
         icon: Percent,
         onClick: handleSetCommissionRate,
-        disabled: (row) => !hasPermission(user, 'canSetCommissionRates') || row.isSuspended,
+        disabled: (row) => !hasPermission(user, 'canSetCommissionRates') && !hasFullAccess || row.isSuspended,
         className: 'text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20'
       },
       {
         label: 'Définir objectifs',
         icon: Target,
         onClick: handleSetTargets,
-        disabled: (row) => !hasPermission(user, 'canEditSalesPeople') || row.isSuspended
+        disabled: (row) => !hasPermission(user, 'canEditSalesPeople') && !hasFullAccess || row.isSuspended
       },
       {
         label: row => row.isSuspended ? 'Réactiver' : 'Suspendre',
         icon: row => row.isSuspended ? UserCheck : UserX,
         onClick: row => row.isSuspended ? handleUnsuspend(row) : handleSuspend(row),
-        disabled: (row) => !hasPermission(user, 'canEditSalesPeople'),
+        disabled: (row) => !hasPermission(user, 'canEditSalesPeople') && !hasFullAccess,
         className: row => row.isSuspended ?
           'text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20' :
           'text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20'
@@ -479,7 +486,7 @@ const SalesPeoplePage = () => {
         icon: Trash2,
         onClick: handleDelete,
         danger: true,
-        disabled: (row) => !hasPermission(user, 'canDeleteSalesPeople')
+        disabled: (row) => !hasPermission(user, 'canDeleteSalesPeople') && !hasFullAccess
       }
     ])
   ];
@@ -508,11 +515,19 @@ const SalesPeoplePage = () => {
       {/* Header with role-based messaging */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
         <div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-            {user?.role === 'ceo' ? 'Tous les Commerciaux' : 'Mes Commerciaux'}
-          </h2>
+          <div className="flex items-center space-x-2">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+              {hasFullAccess ? 'Tous les Commerciaux' : 'Mes Commerciaux'}
+            </h2>
+            {hasFullAccess && (
+              <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400">
+                <Star className="h-3 w-3 mr-1" />
+                Accès complet
+              </span>
+            )}
+          </div>
           <p className="text-gray-600 dark:text-gray-400">
-            {user?.role === 'ceo' 
+            {hasFullAccess 
               ? `Gérez tous les commerciaux de l'entreprise (${totalCount} commercial${totalCount > 1 ? 'aux' : ''})`
               : `Gérez votre équipe de vente (${totalCount} commercial${totalCount > 1 ? 'aux' : ''} sous votre gestion)`
             }
@@ -520,8 +535,8 @@ const SalesPeoplePage = () => {
         </div>
 
         <div className="flex space-x-2">
-          {/* Export buttons for CEO and authorized admins */}
-          {hasPermission(user, 'canViewAllSalesPeople') && (
+          {/* Export buttons for CEO/Super Admin and authorized admins */}
+          {(hasFullAccess || hasPermission(user, 'canViewAllSalesPeople')) && (
             <div className="flex space-x-2">
               <button
                 onClick={() => handleExport('csv')}
@@ -534,10 +549,10 @@ const SalesPeoplePage = () => {
             </div>
           )}
 
-          {hasPermission(user, 'canCreateSalesPeople') && (
+          {(hasFullAccess || hasPermission(user, 'canCreateSalesPeople')) && (
             <button
               onClick={() => setShowCreateModal(true)}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center space-x-2 transition-colors"
+              className={`${hasFullAccess ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'} text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors`}
             >
               <Plus className="h-4 w-4" />
               <span>Nouveau Commercial</span>
@@ -547,7 +562,7 @@ const SalesPeoplePage = () => {
       </div>
 
       {/* Batch operations */}
-      {selectedRows.length > 0 && hasPermission(user, 'canEditSalesPeople') && (
+      {selectedRows.length > 0 && (hasFullAccess || hasPermission(user, 'canEditSalesPeople')) && (
         <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
           <div className="flex items-center justify-between">
             <span className="text-blue-800 dark:text-blue-200">
@@ -578,7 +593,7 @@ const SalesPeoplePage = () => {
       )}
 
       {/* Performance stats */}
-      {performanceStats && hasPermission(user, 'canViewAnalytics') && (
+      {performanceStats && (hasFullAccess || hasPermission(user, 'canViewAnalytics')) && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
             <div className="flex items-center">
@@ -619,7 +634,7 @@ const SalesPeoplePage = () => {
               </div>
               <div className="ml-4">
                 <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {hasPermission(user, 'canSeeCommissionRates') 
+                  {canSeeCommissionRates 
                     ? `$${performanceStats.totalCommissions?.toLocaleString() || '0'}`
                     : 'Masqué'
                   }
@@ -649,7 +664,7 @@ const SalesPeoplePage = () => {
         </div>
       )}
 
-      {/* ✅ SIMPLIFIED: Search and filters - removed status filter */}
+      {/* Search and filters */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
         <div className="flex flex-col lg:flex-row space-y-4 lg:space-y-0 lg:space-x-4">
           {/* Search bar */}
@@ -720,13 +735,13 @@ const SalesPeoplePage = () => {
         columns={columns}
         loading={loading}
         emptyMessage={
-          user?.role === 'ceo' 
+          hasFullAccess 
             ? "Aucun commercial trouvé dans l'entreprise" 
             : "Vous n'avez pas encore créé de commerciaux"
         }
         onRowClick={handleViewDetails}
         className="cursor-pointer"
-        selectable={hasPermission(user, 'canEditSalesPeople')}
+        selectable={hasFullAccess || hasPermission(user, 'canEditSalesPeople')}
         selectedRows={selectedRows}
         onSelectionChange={setSelectedRows}
       />
@@ -745,8 +760,8 @@ const SalesPeoplePage = () => {
         />
       )}
 
-      {/* ✅ ENHANCED: Empty state for non-CEO admins */}
-      {!loading && salesPeople.length === 0 && user?.role !== 'ceo' && (
+      {/* Empty state for non-full-access admins */}
+      {!loading && salesPeople.length === 0 && !hasFullAccess && (
         <div className="text-center py-12">
           <UserPlus className="mx-auto h-12 w-12 text-gray-400" />
           <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">
@@ -755,11 +770,11 @@ const SalesPeoplePage = () => {
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
             Commencez par créer votre premier commercial pour développer votre équipe de vente.
           </p>
-          {hasPermission(user, 'canCreateSalesPeople') && (
+          {(hasFullAccess || hasPermission(user, 'canCreateSalesPeople')) && (
             <div className="mt-6">
               <button
                 onClick={() => setShowCreateModal(true)}
-                className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                className={`inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white ${hasFullAccess ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
               >
                 <Plus className="-ml-1 mr-2 h-5 w-5" />
                 Créer le premier commercial

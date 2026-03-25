@@ -12,7 +12,8 @@ import {
   Calendar, 
   Edit,
   User,
-  Building
+  Building,
+  Star  // Add Star icon for super_admin
 } from 'lucide-react';
 import { formatFullName, formatUserRole } from '../../utils/formatters';
 import { hasPermission } from '../../utils/permissions';
@@ -27,6 +28,8 @@ const AdminDetailsModal = ({ admin, onClose, onEdit }) => {
     switch (role) {
       case 'ceo':
         return <Crown className="w-5 h-5 text-yellow-500" />;
+      case 'super_admin':  // Add super_admin case
+        return <Star className="w-5 h-5 text-purple-500" />;
       case 'regional_manager':
       case 'sales_manager':
         return <Shield className="w-5 h-5 text-blue-500" />;
@@ -40,6 +43,7 @@ const AdminDetailsModal = ({ admin, onClose, onEdit }) => {
   const getRoleBadgeColor = (role) => {
     const colors = {
       'ceo': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400',
+      'super_admin': 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400',  // Add super_admin styling
       'regional_manager': 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400',
       'sales_manager': 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400',
       'team_leader': 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400',
@@ -111,6 +115,13 @@ const AdminDetailsModal = ({ admin, onClose, onEdit }) => {
     canSeeCommissionRates: 'Voir les taux de commission'
   };
 
+  // Check if user has full access (CEO or Super Admin)
+  const hasFullAccess = user?.role === 'ceo' || user?.role === 'super_admin';
+  
+  // Check if user can edit this admin
+  const canEditAdmin = hasFullAccess || 
+    (hasPermission(user, 'canEditAdmins') && admin._id !== user._id);
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
@@ -119,19 +130,34 @@ const AdminDetailsModal = ({ admin, onClose, onEdit }) => {
         <div className="p-6 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+              <div className={`w-14 h-14 rounded-full flex items-center justify-center ${
+                admin.role === 'ceo' 
+                  ? 'bg-gradient-to-br from-yellow-500 to-orange-600'
+                  : admin.role === 'super_admin'
+                  ? 'bg-gradient-to-br from-purple-500 to-pink-600'
+                  : 'bg-gradient-to-br from-blue-500 to-purple-600'
+              }`}>
                 <span className="text-lg font-medium text-white">
                   {admin.firstName?.[0] || 'A'}{admin.lastName?.[0] || 'D'}
                 </span>
               </div>
               <div>
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
-                  {formatFullName(admin.firstName, admin.lastName)}
-                </h3>
+                <div className="flex items-center space-x-2">
+                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+                    {formatFullName(admin.firstName, admin.lastName)}
+                  </h3>
+                  {/* Add special badge for super_admin */}
+                  {admin.role === 'super_admin' && (
+                    <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400">
+                      <Star className="w-3 h-3 mr-1" />
+                      Super Admin
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center space-x-2 mt-1">
                   {getRoleIcon(admin.role)}
                   <span className={`text-sm px-3 py-1 rounded-full font-medium ${getRoleBadgeColor(admin.role)}`}>
-                    {formatUserRole(admin.role)}
+                    {admin.role === 'super_admin' ? 'Super Administrateur' : formatUserRole(admin.role)}
                   </span>
                 </div>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
@@ -140,7 +166,7 @@ const AdminDetailsModal = ({ admin, onClose, onEdit }) => {
               </div>
             </div>
             <div className="flex items-center space-x-2">
-              {hasPermission(user, 'canEditAdmins') && admin._id !== user._id && onEdit && (
+              {canEditAdmin && onEdit && (
                 <button
                   onClick={onEdit}
                   className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
@@ -249,7 +275,7 @@ const AdminDetailsModal = ({ admin, onClose, onEdit }) => {
                       {formatFullName(admin.managedBy.firstName, admin.managedBy.lastName)}
                     </p>
                     <p className="text-sm text-blue-700 dark:text-blue-300">
-                      {formatUserRole(admin.managedBy.role)}
+                      {admin.managedBy.role === 'super_admin' ? 'Super Administrateur' : formatUserRole(admin.managedBy.role)}
                     </p>
                   </div>
                 </div>
@@ -268,13 +294,31 @@ const AdminDetailsModal = ({ admin, onClose, onEdit }) => {
               </span>
             </div>
             
+            {/* Special message for CEO and Super Admin */}
+            {(admin.role === 'ceo' || admin.role === 'super_admin') && (
+              <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                <div className="flex items-center space-x-2">
+                  {admin.role === 'ceo' ? (
+                    <Crown className="w-5 h-5 text-yellow-600" />
+                  ) : (
+                    <Star className="w-5 h-5 text-purple-600" />
+                  )}
+                  <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                    {admin.role === 'ceo' 
+                      ? "Cet utilisateur est le CEO et a automatiquement toutes les permissions."
+                      : "Cet utilisateur est Super Admin et a automatiquement toutes les permissions."}
+                  </p>
+                </div>
+              </div>
+            )}
+            
             {admin.permissions && Object.keys(admin.permissions).length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {Object.entries(admin.permissions).map(([permission, granted]) => (
                   <div 
                     key={permission} 
                     className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
-                      granted 
+                      granted || admin.role === 'ceo' || admin.role === 'super_admin'
                         ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' 
                         : 'bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600'
                     }`}
@@ -282,7 +326,7 @@ const AdminDetailsModal = ({ admin, onClose, onEdit }) => {
                     <span className="text-sm text-gray-700 dark:text-gray-300">
                       {permissionLabels[permission] || permission}
                     </span>
-                    {granted ? (
+                    {(granted || admin.role === 'ceo' || admin.role === 'super_admin') ? (
                       <CheckCircle className="w-4 h-4 text-green-500" />
                     ) : (
                       <XCircle className="w-4 h-4 text-gray-400" />

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, User, Lock, Bell, Database, Shield, Save, Eye, EyeOff } from 'lucide-react';
+import { Settings, User, Lock, Bell, Database, Shield, Save, Eye, EyeOff, Star } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { userService } from '../../services/user.service';
 import { validatePasswordChangeForm } from '../../utils/validators';
@@ -12,6 +12,9 @@ const SettingsPage = () => {
   const [activeTab, setActiveTab] = useState('profile');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
+
+  // Check if user has full access (CEO or Super Admin)
+  const hasFullAccess = user?.role === 'ceo' || user?.role === 'super_admin';
 
   const tabs = [
     { id: 'profile', label: 'Profil', icon: User },
@@ -30,9 +33,17 @@ const SettingsPage = () => {
     <div className="space-y-6">
       {/* En-tête */}
       <div>
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-          Paramètres
-        </h2>
+        <div className="flex items-center space-x-2">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+            Paramètres
+          </h2>
+          {hasFullAccess && (
+            <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400">
+              <Star className="h-3 w-3 mr-1" />
+              Accès complet
+            </span>
+          )}
+        </div>
         <p className="text-gray-600 dark:text-gray-400">
           Gérez vos préférences et paramètres du compte
         </p>
@@ -62,7 +73,9 @@ const SettingsPage = () => {
                   onClick={() => setActiveTab(tab.id)}
                   className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                     activeTab === tab.id
-                      ? 'bg-blue-600 text-white'
+                      ? hasFullAccess 
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-blue-600 text-white'
                       : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                   }`}
                 >
@@ -85,6 +98,7 @@ const SettingsPage = () => {
                 loading={loading}
                 setLoading={setLoading}
                 showMessage={showMessage}
+                hasFullAccess={hasFullAccess}
               />
             )}
             
@@ -93,6 +107,7 @@ const SettingsPage = () => {
                 loading={loading}
                 setLoading={setLoading}
                 showMessage={showMessage}
+                hasFullAccess={hasFullAccess}
               />
             )}
             
@@ -101,6 +116,7 @@ const SettingsPage = () => {
                 loading={loading}
                 setLoading={setLoading}
                 showMessage={showMessage}
+                hasFullAccess={hasFullAccess}
               />
             )}
             
@@ -111,6 +127,7 @@ const SettingsPage = () => {
                 language={language}
                 changeLanguage={changeLanguage}
                 showMessage={showMessage}
+                hasFullAccess={hasFullAccess}
               />
             )}
             
@@ -120,6 +137,7 @@ const SettingsPage = () => {
                 loading={loading}
                 setLoading={setLoading}
                 showMessage={showMessage}
+                hasFullAccess={hasFullAccess}
               />
             )}
           </div>
@@ -130,7 +148,7 @@ const SettingsPage = () => {
 };
 
 // Onglet Profil
-const ProfileTab = ({ user, updateUser, loading, setLoading, showMessage }) => {
+const ProfileTab = ({ user, updateUser, loading, setLoading, showMessage, hasFullAccess }) => {
   const [formData, setFormData] = useState({
     firstName: user?.firstName || '',
     lastName: user?.lastName || '',
@@ -156,6 +174,24 @@ const ProfileTab = ({ user, updateUser, loading, setLoading, showMessage }) => {
     }
   };
 
+  const getRoleDisplay = () => {
+    if (user?.role === 'ceo') return 'PDG';
+    if (user?.role === 'super_admin') return 'Super Administrateur';
+    if (user?.role === 'regional_manager') return 'Directeur Régional';
+    if (user?.role === 'sales_manager') return 'Directeur des Ventes';
+    if (user?.role === 'team_leader') return 'Chef d\'Équipe';
+    return user?.role || 'Administrateur';
+  };
+
+  const getRoleColor = () => {
+    if (user?.role === 'ceo') return 'bg-yellow-100 text-yellow-800';
+    if (user?.role === 'super_admin') return 'bg-purple-100 text-purple-800';
+    if (user?.role === 'regional_manager') return 'bg-purple-100 text-purple-800';
+    if (user?.role === 'sales_manager') return 'bg-blue-100 text-blue-800';
+    if (user?.role === 'team_leader') return 'bg-green-100 text-green-800';
+    return 'bg-gray-100 text-gray-800';
+  };
+
   return (
     <div className="p-6">
       <div className="flex items-center mb-6">
@@ -169,8 +205,14 @@ const ProfileTab = ({ user, updateUser, loading, setLoading, showMessage }) => {
         
         {/* Photo de profil */}
         <div className="flex items-center space-x-4">
-          <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center">
-            <span className="text-2xl font-bold text-blue-600">
+          <div className={`w-20 h-20 rounded-full flex items-center justify-center ${
+            user?.role === 'ceo' 
+              ? 'bg-gradient-to-br from-yellow-500 to-orange-600'
+              : user?.role === 'super_admin'
+              ? 'bg-gradient-to-br from-purple-500 to-pink-600'
+              : 'bg-gradient-to-br from-blue-500 to-purple-600'
+          }`}>
+            <span className="text-2xl font-bold text-white">
               {user?.firstName?.[0]}{user?.lastName?.[0]}
             </span>
           </div>
@@ -178,9 +220,17 @@ const ProfileTab = ({ user, updateUser, loading, setLoading, showMessage }) => {
             <h4 className="text-lg font-medium text-gray-900 dark:text-white">
               {user?.firstName} {user?.lastName}
             </h4>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              {user?.role === 'ceo' ? 'PDG' : user?.role}
-            </p>
+            <div className="flex items-center space-x-2">
+              <span className={`text-sm px-2 py-1 rounded-full font-medium ${getRoleColor()}`}>
+                {getRoleDisplay()}
+              </span>
+              {hasFullAccess && (
+                <span className="text-xs text-purple-600 dark:text-purple-400 flex items-center">
+                  <Star className="h-3 w-3 mr-1" />
+                  Accès complet
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
@@ -257,7 +307,7 @@ const ProfileTab = ({ user, updateUser, loading, setLoading, showMessage }) => {
           <button
             onClick={handleSave}
             disabled={loading}
-            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center space-x-2"
+            className={`${hasFullAccess ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'} text-white px-6 py-2 rounded-lg disabled:opacity-50 flex items-center space-x-2`}
           >
             {loading ? (
               <LoadingSpinner size="sm" color="white" />
@@ -273,7 +323,7 @@ const ProfileTab = ({ user, updateUser, loading, setLoading, showMessage }) => {
 };
 
 // Onglet Sécurité
-const SecurityTab = ({ loading, setLoading, showMessage }) => {
+const SecurityTab = ({ loading, setLoading, showMessage, hasFullAccess }) => {
   const [formData, setFormData] = useState({
     currentPassword: '',
     newPassword: '',
@@ -454,7 +504,7 @@ const SecurityTab = ({ loading, setLoading, showMessage }) => {
 };
 
 // Onglet Notifications
-const NotificationsTab = ({ loading, setLoading, showMessage }) => {
+const NotificationsTab = ({ loading, setLoading, showMessage, hasFullAccess }) => {
   const [notifications, setNotifications] = useState({
     emailCommissions: true,
     emailReports: true,
@@ -602,7 +652,7 @@ const NotificationsTab = ({ loading, setLoading, showMessage }) => {
           <button
             onClick={handleSave}
             disabled={loading}
-            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center space-x-2"
+            className={`${hasFullAccess ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'} text-white px-6 py-2 rounded-lg disabled:opacity-50 flex items-center space-x-2`}
           >
             {loading ? (
               <LoadingSpinner size="sm" color="white" />
@@ -618,7 +668,7 @@ const NotificationsTab = ({ loading, setLoading, showMessage }) => {
 };
 
 // Onglet Préférences
-const PreferencesTab = ({ theme, toggleTheme, language, changeLanguage, showMessage }) => {
+const PreferencesTab = ({ theme, toggleTheme, language, changeLanguage, showMessage, hasFullAccess }) => {
   const [preferences, setPreferences] = useState({
     dateFormat: 'dd/mm/yyyy',
     currency: 'EUR',
@@ -729,9 +779,9 @@ const PreferencesTab = ({ theme, toggleTheme, language, changeLanguage, showMess
                 onChange={(e) => setPreferences(prev => ({ ...prev, currency: e.target.value }))}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
               >
-                {/* <option value="EUR">Euro (€)</option> */}
+                <option value="EUR">Euro (€)</option>
                 <option value="USD">Dollar US ($)</option>
-                {/* <option value="GBP">Livre Sterling (£)</option> */}
+                <option value="GBP">Livre Sterling (£)</option>
               </select>
             </div>
           </div>
@@ -783,7 +833,7 @@ const PreferencesTab = ({ theme, toggleTheme, language, changeLanguage, showMess
         <div className="flex justify-end">
           <button
             onClick={handleSavePreferences}
-            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 flex items-center space-x-2"
+            className={`${hasFullAccess ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'} text-white px-6 py-2 rounded-lg flex items-center space-x-2`}
           >
             <Save className="h-4 w-4" />
             <span>Sauvegarder les préférences</span>
@@ -795,7 +845,7 @@ const PreferencesTab = ({ theme, toggleTheme, language, changeLanguage, showMess
 };
 
 // Onglet Système
-const SystemTab = ({ user, loading, setLoading, showMessage }) => {
+const SystemTab = ({ user, loading, setLoading, showMessage, hasFullAccess }) => {
   const handleExportData = async () => {
     setLoading(true);
     try {
@@ -826,6 +876,12 @@ const SystemTab = ({ user, loading, setLoading, showMessage }) => {
     }
   };
 
+  const getRoleDisplay = () => {
+    if (user?.role === 'ceo') return 'PDG';
+    if (user?.role === 'super_admin') return 'Super Administrateur';
+    return user?.role || 'Administrateur';
+  };
+
   return (
     <div className="p-6">
       <div className="flex items-center mb-6">
@@ -850,7 +906,14 @@ const SystemTab = ({ user, loading, setLoading, showMessage }) => {
             </div>
             <div>
               <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Rôle</span>
-              <p className="text-sm text-gray-900 dark:text-white">{user?.role === 'ceo' ? 'PDG' : user?.role}</p>
+              <div className="flex items-center space-x-2">
+                <p className="text-sm text-gray-900 dark:text-white">{getRoleDisplay()}</p>
+                {hasFullAccess && (
+                  <span className="text-xs text-purple-600 dark:text-purple-400 flex items-center">
+                    <Star className="h-3 w-3" />
+                  </span>
+                )}
+              </div>
             </div>
             <div>
               <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Date de création</span>
@@ -861,7 +924,7 @@ const SystemTab = ({ user, loading, setLoading, showMessage }) => {
             <div>
               <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Dernière connexion</span>
               <p className="text-sm text-gray-900 dark:text-white">
-                {user?.lastLoginAt ? new Date(user.lastLoginAt).toLocaleDateString('fr-FR') : 'N/A'}
+                {user?.lastLogin ? new Date(user.lastLogin).toLocaleDateString('fr-FR') : 'N/A'}
               </p>
             </div>
           </div>
@@ -916,10 +979,10 @@ const SystemTab = ({ user, loading, setLoading, showMessage }) => {
               </button>
             </div>
             
-            {user?.role === 'ceo' && (
+            {(hasFullAccess) && (
               <div>
                 <p className="text-sm text-red-700 dark:text-red-300 mb-2">
-                  Supprimer définitivement mon compte (CEO uniquement)
+                  Supprimer définitivement mon compte (CEO/Super Admin uniquement)
                 </p>
                 <button 
                   onClick={handleDeleteAccount}

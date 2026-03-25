@@ -44,7 +44,7 @@ export const promotionService = {
     }
   },
 
-  // Build hierarchy from admin and sales data
+  // Build hierarchy from admin and sales data (with Super Admin support)
   buildHierarchyFromData(admins, salesPeople) {
     const allPeople = new Map();
     
@@ -64,6 +64,7 @@ export const promotionService = {
           role: admin.managedBy.role
         } : null,
         isActive: admin.isActive,
+        isSuperAdmin: admin.role === 'super_admin',
         children: [],
         directReportsCount: 0
       });
@@ -103,7 +104,7 @@ export const promotionService = {
           manager.directReportsCount++;
         }
       } else {
-        // Top level (CEO or no manager)
+        // Top level (CEO, Super Admin, or no manager)
         tree.push(person);
       }
     });
@@ -114,6 +115,7 @@ export const promotionService = {
         node.children.sort((a, b) => {
           const roleOrder = { 
             'ceo': 1, 
+            'super_admin': 1,  // Same level as CEO
             'regional_manager': 2, 
             'sales_manager': 3, 
             'team_leader': 4, 
@@ -188,11 +190,12 @@ export const promotionService = {
             name: `${admin.firstName} ${admin.lastName}`,
             email: admin.email,
             role: admin.role,
+            isSuperAdmin: admin.role === 'super_admin',
             territory: admin.territory,
             teamName: admin.teamName,
             type: 'Admin',
             isActive: admin.isActive,
-            directReportsCount: 0 // Would need additional queries to get this
+            directReportsCount: 0
           })),
           ...(salesResponse.data.salesPeople || []).map(sales => ({
             id: sales._id,
@@ -213,6 +216,7 @@ export const promotionService = {
           name: `${person.firstName} ${person.lastName}`,
           email: person.email,
           role: personType === 'Admin' ? person.role : 'Sales Person',
+          isSuperAdmin: person.role === 'super_admin',
           salesId: person.salesId || null,
           territory: person.territory,
           teamName: person.teamName,
@@ -286,6 +290,7 @@ export const promotionService = {
                 name: `${admin.firstName} ${admin.lastName}`,
                 email: admin.email,
                 role: admin.role,
+                isSuperAdmin: admin.role === 'super_admin',
                 territory: admin.territory,
                 teamName: admin.teamName,
                 type: 'Admin',
@@ -341,7 +346,7 @@ export const promotionService = {
   },
 
   // ================================
-  // PROMOTION OPERATIONS
+  // PROMOTION OPERATIONS (with Super Admin support)
   // ================================
 
   // Promote sales person to admin
@@ -354,13 +359,23 @@ export const promotionService = {
     }
   },
 
-  // Promote admin to higher role
+  // Promote admin to higher role (including to Super Admin)
   async promoteAdmin(adminId, promotionData) {
     try {
       const response = await apiClient.post(`/admin/promote-admin/${adminId}`, promotionData);
       return response.data;
     } catch (error) {
       throw new Error(error.response?.data?.message || 'Erreur lors de la promotion de l\'administrateur');
+    }
+  },
+
+  // Promote to Super Admin (CEO only)
+  async promoteToSuperAdmin(adminId, promotionData) {
+    try {
+      const response = await apiClient.post(`/admin/promote-to-super-admin/${adminId}`, promotionData);
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Erreur lors de la promotion en Super Admin');
     }
   },
 
@@ -371,6 +386,16 @@ export const promotionService = {
       return response.data;
     } catch (error) {
       throw new Error(error.response?.data?.message || 'Erreur lors de la rétrogradation de l\'administrateur');
+    }
+  },
+
+  // Demote Super Admin to regular admin (CEO only)
+  async demoteFromSuperAdmin(adminId, demotionData) {
+    try {
+      const response = await apiClient.post(`/admin/demote-from-super-admin/${adminId}`, demotionData);
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Erreur lors de la rétrogradation du Super Admin');
     }
   },
 
@@ -385,7 +410,7 @@ export const promotionService = {
   },
 
   // ================================
-  // VALIDATION HELPERS
+  // VALIDATION HELPERS (with Super Admin)
   // ================================
 
   // Validate promotion data for sales person to admin
@@ -415,7 +440,7 @@ export const promotionService = {
     };
   },
 
-  // Validate admin promotion data
+  // Validate admin promotion data (with Super Admin support)
   validateAdminPromotion(data, currentRole) {
     const errors = {};
 
@@ -423,17 +448,23 @@ export const promotionService = {
       errors.newRole = 'Le nouveau rôle est requis';
     }
 
-    // Define valid promotion paths
+    // Define valid promotion paths (including Super Admin)
     const promotionPaths = {
       'admin': ['team_leader'],
       'team_leader': ['sales_manager'],
       'sales_manager': ['regional_manager'],
-      'regional_manager': [] // Cannot promote regional manager further
+      'regional_manager': ['super_admin'], // Regional managers can be promoted to Super Admin
+      'super_admin': [] // Cannot promote Super Admin further
     };
 
     const validPromotions = promotionPaths[currentRole] || [];
-    if (data.newRole && !validPromotions.includes(data.newRole)) {
+    if (data.newRole && !validPromotions.includes(data.newRole) && data.newRole !== 'super_admin') {
       errors.newRole = `Impossible de promouvoir ${currentRole} vers ${data.newRole}`;
+    }
+
+    // Special validation for Super Admin promotion
+    if (data.newRole === 'super_admin' && currentRole !== 'regional_manager') {
+      errors.newRole = 'Seuls les Directeurs Régionaux peuvent être promus Super Admin';
     }
 
     if (!data.reason || data.reason.trim().length < 10) {
@@ -446,7 +477,7 @@ export const promotionService = {
     };
   },
 
-  // Validate demotion data
+  // Validate demotion data (with Super Admin support)
   validateDemotion(data, currentRole) {
     const errors = {};
 
@@ -459,8 +490,9 @@ export const promotionService = {
         errors.newRole = 'Le nouveau rôle est requis';
       }
 
-      // Define valid demotion paths
+      // Define valid demotion paths (including from Super Admin)
       const demotionPaths = {
+        'super_admin': ['regional_manager'], // Super Admin can be demoted to Regional Manager
         'regional_manager': ['sales_manager'],
         'sales_manager': ['team_leader'],
         'team_leader': ['admin'],
@@ -468,7 +500,7 @@ export const promotionService = {
       };
 
       const validDemotions = demotionPaths[currentRole] || [];
-      if (data.newRole && !validDemotions.includes(data.newRole)) {
+      if (data.newRole && !validDemotions.includes(data.newRole) && !data.demoteToSalesPerson) {
         errors.newRole = `Impossible de rétrograder ${currentRole} vers ${data.newRole}`;
       }
     }
@@ -484,7 +516,7 @@ export const promotionService = {
   },
 
   // ================================
-  // ROLE UTILITIES
+  // ROLE UTILITIES (with Super Admin)
   // ================================
 
   // Get available promotion options for a role
@@ -493,18 +525,23 @@ export const promotionService = {
       'admin': ['team_leader'],
       'team_leader': ['sales_manager'],
       'sales_manager': ['regional_manager'],
-      'regional_manager': []
+      'regional_manager': ['super_admin'], // Regional manager can become Super Admin
+      'super_admin': [] // Cannot promote Super Admin further
     };
 
     let availablePromotions = promotionPaths[currentRole] || [];
 
-    // Filter based on user's own role (can't promote above themselves except CEO)
+    // Filter based on user's own role
+    // Only CEO can promote to Super Admin
     if (userRole !== 'ceo') {
-      const userLevel = this.getRoleLevel(userRole);
-      availablePromotions = availablePromotions.filter(role => 
-        this.getRoleLevel(role) <= userLevel
-      );
+      availablePromotions = availablePromotions.filter(role => role !== 'super_admin');
     }
+
+    // Filter based on user's own role level
+    const userLevel = this.getRoleLevel(userRole);
+    availablePromotions = availablePromotions.filter(role => 
+      this.getRoleLevel(role) >= userLevel || userRole === 'ceo'
+    );
 
     return availablePromotions;
   },
@@ -512,6 +549,7 @@ export const promotionService = {
   // Get available demotion options for a role
   getDemotionOptions(currentRole) {
     const demotionPaths = {
+      'super_admin': ['regional_manager'], // Super Admin can be demoted to Regional Manager
       'regional_manager': ['sales_manager'],
       'sales_manager': ['team_leader'],
       'team_leader': ['admin'],
@@ -525,6 +563,7 @@ export const promotionService = {
   getRoleLevel(role) {
     const levels = {
       'ceo': 1,
+      'super_admin': 1, // Same level as CEO
       'regional_manager': 2,
       'sales_manager': 3,
       'team_leader': 4,
@@ -536,14 +575,20 @@ export const promotionService = {
 
   // Check if user can promote/demote target person
   canManagePerson(userRole, targetRole, action = 'promote') {
+    // CEO can manage everyone
     if (userRole === 'ceo') return true;
+    
+    // Super Admin can manage everyone except CEO
+    if (userRole === 'super_admin') {
+      return targetRole !== 'ceo';
+    }
 
     const userLevel = this.getRoleLevel(userRole);
     const targetLevel = this.getRoleLevel(targetRole);
 
     // Can only manage people at lower levels
     if (action === 'promote') {
-      // Can promote if target is at lower level and promotion wouldn't exceed user's level
+      // Can promote if target is at lower level
       return targetLevel > userLevel;
     } else if (action === 'demote') {
       // Can demote if target is at same or lower level (but not equal to user)
@@ -553,14 +598,20 @@ export const promotionService = {
     return false;
   },
 
+  // Check if user can promote someone to Super Admin
+  canPromoteToSuperAdmin(userRole) {
+    return userRole === 'ceo';
+  },
+
   // ================================
-  // DISPLAY HELPERS
+  // DISPLAY HELPERS (with Super Admin)
   // ================================
 
   // Get role display name in French
   getRoleDisplayName(role) {
     const roleNames = {
       'ceo': 'PDG',
+      'super_admin': 'Super Administrateur',
       'regional_manager': 'Directeur Régional',
       'sales_manager': 'Directeur des Ventes',
       'team_leader': 'Chef d\'Équipe',
@@ -575,6 +626,7 @@ export const promotionService = {
   getRoleColor(role) {
     const colors = {
       'ceo': 'text-yellow-600 bg-yellow-100 dark:bg-yellow-900/20 dark:text-yellow-400',
+      'super_admin': 'text-purple-600 bg-purple-100 dark:bg-purple-900/20 dark:text-purple-400',
       'regional_manager': 'text-purple-600 bg-purple-100 dark:bg-purple-900/20 dark:text-purple-400',
       'sales_manager': 'text-blue-600 bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400',
       'team_leader': 'text-green-600 bg-green-100 dark:bg-green-900/20 dark:text-green-400',
@@ -601,6 +653,14 @@ export const promotionService = {
       return {
         eligible: false,
         reason: 'Vous ne pouvez pas promouvoir cette personne'
+      };
+    }
+
+    // Special check for Super Admin promotion
+    if (availablePromotions.includes('super_admin') && userRole !== 'ceo') {
+      return {
+        eligible: false,
+        reason: 'Seul le PDG peut promouvoir en Super Admin'
       };
     }
 
@@ -637,6 +697,10 @@ export const promotionService = {
             result = await this.promoteAdmin(operation.personId, operation.data);
           } else if (operation.type === 'admin_demotion') {
             result = await this.demoteAdmin(operation.personId, operation.data);
+          } else if (operation.type === 'promote_to_super_admin') {
+            result = await this.promoteToSuperAdmin(operation.personId, operation.data);
+          } else if (operation.type === 'demote_from_super_admin') {
+            result = await this.demoteFromSuperAdmin(operation.personId, operation.data);
           }
 
           results.push({
@@ -674,13 +738,11 @@ export const promotionService = {
   // Get promotion statistics
   async getPromotionStats(period = 'year') {
     try {
-      // This would be a new endpoint to implement
       const response = await apiClient.get('/admin/promotion-stats', {
         params: { period }
       });
       return response.data;
     } catch (error) {
-      // Return empty stats if endpoint doesn't exist yet
       return {
         success: true,
         stats: {
@@ -688,6 +750,7 @@ export const promotionService = {
           totalDemotions: 0,
           salesPersonPromotions: 0,
           adminPromotions: 0,
+          superAdminPromotions: 0,
           byRole: {}
         }
       };

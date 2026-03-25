@@ -27,18 +27,19 @@ import Home from '../Copied/lib/components/Home/Home.jsx'
 import FreeListingsPage from '../FreeListings/FreeListingsPage';
 import HotelKYCPage from '../HotelKYC/HotelKYCPage';
 
-
-
 const MainLayout = () => {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const { userType, isAdmin, isSalesPerson } = useAuth();
+  const { user, userType, isAdmin, isSalesPerson } = useAuth();
+
+  // Check if user has full access (CEO or Super Admin)
+  const hasFullAccess = user?.role === 'ceo' || user?.role === 'super_admin';
 
   const getPageConfigurations = () => {
     if (isAdmin()) {
       return {
         dashboard: {
-          title: 'Tableau de Bord',
+          title: hasFullAccess ? 'Super Admin Dashboard' : 'Tableau de Bord',
           component: Dashboard
         },
         'ads': {
@@ -89,10 +90,10 @@ const MainLayout = () => {
           title: 'Paramètres',
           component: SettingsPage
         },
-        'hotel-kyc': {                        // ← NEW
-          title: 'KYC Hôtels',
-          component: HotelKYCPage
-        },
+        // 'hotel-kyc': {
+        //   title: 'KYC Hôtels',
+        //   component: HotelKYCPage
+        // },
       };
     } else if (isSalesPerson()) {
       return {

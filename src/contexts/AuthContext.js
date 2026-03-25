@@ -20,6 +20,15 @@ export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userType, setUserType] = useState(null); // 'admin' | 'sales_person'
 
+  // Check if user has full access (CEO or Super Admin)
+  const hasFullAccess = () => {
+    if (!user) return false;
+    if (userType === 'admin') {
+      return user?.role === 'ceo' || user?.role === 'super_admin';
+    }
+    return false;
+  };
+
   // Initialiser l'authentification au chargement
   useEffect(() => {
     initializeAuth();
@@ -40,11 +49,20 @@ export const AuthProvider = ({ children }) => {
         setUser(adminUser);
         setUserType('admin');
         setIsAuthenticated(true);
+        console.log('✅ Auth initialized - Admin:', { 
+          role: adminUser.role,
+          email: adminUser.email,
+          hasFullAccess: hasFullAccess()
+        });
       } else if (salesToken && salesPerson) {
         setToken(salesToken);
         setUser(salesPerson);
         setUserType('sales_person');
         setIsAuthenticated(true);
+        console.log('✅ Auth initialized - Sales Person:', {
+          salesId: salesPerson.salesId,
+          email: salesPerson.email
+        });
       }
     } catch (error) {
       console.error('Erreur lors de l\'initialisation de l\'authentification:', error);
@@ -74,6 +92,12 @@ export const AuthProvider = ({ children }) => {
           setUser(admin);
           setUserType('admin');
           setIsAuthenticated(true);
+          
+          console.log('✅ Admin login successful:', {
+            role: admin.role,
+            email: admin.email,
+            hasFullAccess: admin.role === 'ceo' || admin.role === 'super_admin'
+          });
           
           return { success: true, userType: 'admin' };
         }
@@ -175,14 +199,17 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // ✅ ENHANCED: Permission checking based on user type
+  // ✅ ENHANCED: Permission checking based on user type with Super Admin support
   const hasPermission = (permission) => {
     if (!user) return false;
     
     if (userType === 'admin') {
+      // Super Admin and CEO have all permissions
+      if (user.role === 'ceo' || user.role === 'super_admin') {
+        return true;
+      }
+      
       if (!user.permissions) return false;
-      // CEO has all permissions
-      if (user.role === 'ceo') return true;
       return user.permissions[permission] === true;
     }
     
@@ -191,7 +218,10 @@ export const AuthProvider = ({ children }) => {
       const salesPermissions = {
         canRegisterUsers: true,
         canViewOwnData: true,
-        canEditProfile: true
+        canEditProfile: true,
+        canViewCommissions: true,
+        canViewSalesPeople: false,
+        canEditSalesPeople: false
       };
       return salesPermissions[permission] === true;
     }
@@ -205,8 +235,8 @@ export const AuthProvider = ({ children }) => {
     // Only admins can manage entities
     if (userType !== 'admin') return false;
     
-    // CEO peut tout gérer
-    if (user.role === 'ceo') return true;
+    // Super Admin and CEO can manage everything
+    if (user.role === 'ceo' || user.role === 'super_admin') return true;
     
     // Vérifier les permissions de gestion spécifiques
     if (!user.managementScope) return false;
@@ -224,11 +254,48 @@ export const AuthProvider = ({ children }) => {
   // ✅ NEW: Check if current user is sales person
   const isSalesPerson = () => userType === 'sales_person';
   
+  // ✅ NEW: Check if user is Super Admin or CEO
+  const isSuperAdmin = () => {
+    if (userType === 'admin') {
+      return user?.role === 'ceo' || user?.role === 'super_admin';
+    }
+    return false;
+  };
+  
   // ✅ NEW: Get user role (works for both types)
   const getUserRole = () => {
     if (userType === 'admin') return user?.role;
     if (userType === 'sales_person') return 'sales_person';
     return null;
+  };
+  
+  // ✅ NEW: Get user display name
+  const getUserDisplayName = () => {
+    if (!user) return 'Utilisateur';
+    if (userType === 'admin') {
+      return `${user.firstName} ${user.lastName}`;
+    }
+    if (userType === 'sales_person') {
+      return `${user.firstName} ${user.lastName}`;
+    }
+    return 'Utilisateur';
+  };
+  
+  // ✅ NEW: Get user role display
+  const getUserRoleDisplay = () => {
+    if (userType === 'admin') {
+      const role = user?.role;
+      if (role === 'ceo') return 'CEO';
+      if (role === 'super_admin') return 'Super Admin';
+      if (role === 'regional_manager') return 'Directeur Régional';
+      if (role === 'sales_manager') return 'Directeur des Ventes';
+      if (role === 'team_leader') return 'Chef d\'Équipe';
+      return 'Administrateur';
+    }
+    if (userType === 'sales_person') {
+      return 'Commercial';
+    }
+    return 'Utilisateur';
   };
 
   const refreshToken = async () => {
@@ -249,8 +316,26 @@ export const AuthProvider = ({ children }) => {
   // Auto-logout quand le token expire
   useEffect(() => {
     if (token) {
-      // Vous pouvez implémenter une logique pour vérifier l'expiration du token
-      // et déclencher un refresh ou un logout automatique
+      // You can implement token expiration checking logic here
+      // For example, decode JWT and check exp claim
+      try {
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+        
+        const decoded = JSON.parse(jsonPayload);
+        const expTime = decoded.exp * 1000;
+        const now = Date.now();
+        
+        if (expTime < now) {
+          console.log('Token expired, logging out...');
+          logout();
+        }
+      } catch (err) {
+        console.error('Error decoding token:', err);
+      }
     }
   }, [token]);
 
@@ -274,7 +359,11 @@ export const AuthProvider = ({ children }) => {
     canManage,
     isAdmin,
     isSalesPerson,
-    getUserRole //
+    getUserRole,
+    getUserDisplayName,
+    getUserRoleDisplay,
+    hasFullAccess, // ✅ NEW
+    isSuperAdmin, // ✅ NEW
   };
 
   return (

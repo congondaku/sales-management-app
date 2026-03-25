@@ -36,7 +36,7 @@ export const userService = {
   },
 
   // ================================
-  // ADMIN MANAGEMENT
+  // ADMIN MANAGEMENT (ENHANCED)
   // ================================
 
   // Obtenir tous les admins
@@ -66,6 +66,40 @@ export const userService = {
       return response.data;
     } catch (error) {
       throw new Error(error.response?.data?.message || 'Erreur lors de la suppression de l\'administrateur');
+    }
+  },
+
+  // ✅ NEW: Promouvoir un admin en Super Admin (CEO seulement)
+  async promoteToSuperAdmin(adminId, reason = '') {
+    try {
+      const response = await apiClient.put(`/permissions/admin/${adminId}/promote-to-super-admin`, {
+        reason
+      });
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Erreur lors de la promotion en Super Admin');
+    }
+  },
+
+  // ✅ NEW: Rétrograder un Super Admin (CEO seulement)
+  async demoteFromSuperAdmin(adminId, reason = '') {
+    try {
+      const response = await apiClient.put(`/permissions/admin/${adminId}/demote-from-super-admin`, {
+        reason
+      });
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Erreur lors de la rétrogradation de Super Admin');
+    }
+  },
+
+  // ✅ NEW: Obtenir tous les Super Admins
+  async getSuperAdmins() {
+    try {
+      const response = await apiClient.get('/permissions/super-admins');
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Erreur lors du chargement des Super Admins');
     }
   },
 
@@ -108,10 +142,10 @@ export const userService = {
   },
 
   // ================================
-  // ENHANCED USER OPERATIONS (NEW)
+  // ENHANCED USER OPERATIONS
   // ================================
 
-  // ✅ NEW: Rechercher des utilisateurs
+  // Rechercher des utilisateurs
   async searchUsers(searchParams) {
     try {
       const params = {};
@@ -146,7 +180,7 @@ export const userService = {
     }
   },
 
-  // ✅ NEW: Obtenir les utilisateurs par commercial
+  // Obtenir les utilisateurs par commercial
   async getUsersBySalesPerson(salesPersonId, params = {}) {
     try {
       const response = await this.getUsers({
@@ -159,7 +193,7 @@ export const userService = {
     }
   },
 
-  // ✅ NEW: Obtenir les utilisateurs par territoire
+  // Obtenir les utilisateurs par territoire
   async getUsersByTerritory(territory, params = {}) {
     try {
       const response = await this.getUsers({
@@ -172,7 +206,7 @@ export const userService = {
     }
   },
 
-  // ✅ NEW: Obtenir les statistiques des utilisateurs
+  // Obtenir les statistiques des utilisateurs
   async getUserStats(params = {}) {
     try {
       const users = await this.getUsers({ limit: 1, ...params });
@@ -214,10 +248,10 @@ export const userService = {
   },
 
   // ================================
-  // VALIDATION & HELPER METHODS (NEW)
+  // VALIDATION & HELPER METHODS (ENHANCED)
   // ================================
 
-  // ✅ NEW: Valider les données utilisateur
+  // Valider les données utilisateur
   validateUserData(userData) {
     const errors = {};
 
@@ -243,7 +277,7 @@ export const userService = {
     };
   },
 
-  // ✅ NEW: Valider les données admin
+  // Valider les données admin avec support Super Admin
   validateAdminData(adminData) {
     const errors = {};
 
@@ -263,7 +297,7 @@ export const userService = {
       errors.role = 'Le rôle est requis';
     }
 
-    const validRoles = ['ceo', 'regional_manager', 'sales_manager', 'team_leader', 'admin'];
+    const validRoles = ['ceo', 'super_admin', 'regional_manager', 'sales_manager', 'team_leader', 'admin'];
     if (adminData.role && !validRoles.includes(adminData.role)) {
       errors.role = 'Rôle invalide';
     }
@@ -274,13 +308,18 @@ export const userService = {
     };
   },
 
-  // ✅ NEW: Formatter le nom complet
+  // ✅ NEW: Vérifier si un rôle a accès complet
+  isFullAccessRole(role) {
+    return role === 'ceo' || role === 'super_admin';
+  },
+
+  // Formatter le nom complet
   formatFullName(user) {
     if (!user) return 'N/A';
     return `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'N/A';
   },
 
-  // ✅ NEW: Formatter le statut utilisateur
+  // Formatter le statut utilisateur
   formatUserStatus(user) {
     if (!user) return 'unknown';
     
@@ -305,7 +344,7 @@ export const userService = {
     return 'new';
   },
 
-  // ✅ NEW: Obtenir la couleur du statut
+  // Obtenir la couleur du statut
   getStatusColor(status) {
     const colorMap = {
       'active': 'green',
@@ -319,7 +358,7 @@ export const userService = {
     return colorMap[status] || 'gray';
   },
 
-  // ✅ NEW: Formatter la date de dernière connexion
+  // Formatter la date de dernière connexion
   formatLastLogin(lastLogin) {
     if (!lastLogin) return 'Jamais connecté';
     
@@ -341,11 +380,39 @@ export const userService = {
     }
   },
 
+  // ✅ NEW: Formatter le rôle pour affichage
+  formatRole(role) {
+    const roleMap = {
+      'ceo': 'PDG',
+      'super_admin': 'Super Administrateur',
+      'regional_manager': 'Directeur Régional',
+      'sales_manager': 'Directeur des Ventes',
+      'team_leader': 'Chef d\'Équipe',
+      'admin': 'Administrateur',
+      'sales_person': 'Commercial'
+    };
+    return roleMap[role] || role || 'N/A';
+  },
+
+  // ✅ NEW: Obtenir la couleur du rôle
+  getRoleColor(role) {
+    const colorMap = {
+      'ceo': 'yellow',
+      'super_admin': 'purple',
+      'regional_manager': 'purple',
+      'sales_manager': 'blue',
+      'team_leader': 'green',
+      'admin': 'gray',
+      'sales_person': 'green'
+    };
+    return colorMap[role] || 'gray';
+  },
+
   // ================================
-  // BATCH OPERATIONS (NEW)
+  // BATCH OPERATIONS
   // ================================
 
-  // ✅ NEW: Supprimer plusieurs utilisateurs
+  // Supprimer plusieurs utilisateurs
   async batchDeleteUsers(userIds) {
     try {
       const promises = userIds.map(id => this.deleteUser(id));
@@ -366,7 +433,7 @@ export const userService = {
     }
   },
 
-  // ✅ NEW: Exporter les utilisateurs
+  // Exporter les utilisateurs
   async exportUsers(params = {}, format = 'csv') {
     try {
       // Obtenir tous les utilisateurs sans pagination
@@ -389,7 +456,7 @@ export const userService = {
     }
   },
 
-  // ✅ NEW: Exporter en CSV
+  // Exporter en CSV
   exportToCSV(users) {
     const headers = [
       'ID',
@@ -428,7 +495,7 @@ export const userService = {
     };
   },
 
-  // ✅ NEW: Exporter en JSON
+  // Exporter en JSON
   exportToJSON(users) {
     const exportData = {
       exportDate: new Date().toISOString(),
@@ -457,10 +524,10 @@ export const userService = {
   },
 
   // ================================
-  // REPORTING (NEW)
+  // REPORTING (ENHANCED)
   // ================================
 
-  // ✅ NEW: Générer un rapport d'utilisateurs
+  // Générer un rapport d'utilisateurs
   async generateUserReport(params = {}) {
     try {
       const [users, stats] = await Promise.all([
@@ -509,6 +576,54 @@ export const userService = {
       };
     } catch (error) {
       throw new Error(error.message || 'Erreur lors de la génération du rapport');
+    }
+  },
+
+  // ✅ NEW: Générer un rapport des admins
+  async generateAdminReport(params = {}) {
+    try {
+      const admins = await this.getAdmins(params);
+      
+      // Grouper par rôle
+      const adminsByRole = {};
+      admins.admins?.forEach(admin => {
+        if (!adminsByRole[admin.role]) {
+          adminsByRole[admin.role] = [];
+        }
+        adminsByRole[admin.role].push(admin);
+      });
+
+      // Compter les Super Admins
+      const superAdmins = (admins.admins || []).filter(a => a.role === 'super_admin').length;
+      const ceos = (admins.admins || []).filter(a => a.role === 'ceo').length;
+
+      return {
+        success: true,
+        report: {
+          totalAdmins: admins.total || 0,
+          ceos,
+          superAdmins,
+          adminsByRole: Object.keys(adminsByRole).map(role => ({
+            role,
+            roleLabel: this.formatRole(role),
+            count: adminsByRole[role].length,
+            admins: adminsByRole[role]
+          })),
+          hierarchy: await this.getAdminHierarchy()
+        }
+      };
+    } catch (error) {
+      throw new Error(error.message || 'Erreur lors de la génération du rapport admin');
+    }
+  },
+
+  // ✅ NEW: Obtenir la hiérarchie admin
+  async getAdminHierarchy() {
+    try {
+      const response = await apiClient.get('/permissions/hierarchy');
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Erreur lors du chargement de la hiérarchie');
     }
   }
 };

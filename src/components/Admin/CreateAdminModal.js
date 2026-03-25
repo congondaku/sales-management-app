@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, User, Mail, Lock, MapPin, Users, Shield, Eye, EyeOff } from 'lucide-react';
+import { X, User, Mail, Lock, MapPin, Users, Shield, Eye, EyeOff, Star } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { authService } from '../../services/auth.service';
 import { hasPermission, getAssignableRoles } from '../../utils/permissions';
@@ -11,6 +11,9 @@ const CreateAdminModal = ({ onClose, onSuccess }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [availableManagers, setAvailableManagers] = useState([]);
   const [territories, setTerritories] = useState([]);
+  
+  // Check if user has full access (CEO or Super Admin)
+  const hasFullAccess = user?.role === 'ceo' || user?.role === 'super_admin';
   
   const [formData, setFormData] = useState({
     firstName: '',
@@ -160,7 +163,52 @@ const CreateAdminModal = ({ onClose, onSuccess }) => {
   };
 
   // Obtenir les rôles assignables par l'utilisateur actuel
-  const assignableRoles = getAssignableRoles(user?.role);
+  const getAssignableRolesList = () => {
+    if (hasFullAccess) {
+      // CEO and Super Admin can assign all roles except CEO
+      const allRoles = Object.values(USER_ROLES);
+      return allRoles.filter(role => role !== USER_ROLES.CEO);
+    }
+    return getAssignableRoles(user?.role);
+  };
+
+  const assignableRoles = getAssignableRolesList();
+
+  // Check if Super Admin creation is allowed
+  const canCreateSuperAdmin = hasFullAccess;
+
+  // Get role description
+  const getRoleDescription = (role) => {
+    switch (role) {
+      case USER_ROLES.SUPER_ADMIN:
+        return 'Super Administrateur - Accès complet à toutes les fonctionnalités (niveau PDG)';
+      case USER_ROLES.CEO:
+        return 'PDG - Accès complet et exclusif';
+      case USER_ROLES.REGIONAL_MANAGER:
+        return 'Directeur Régional - Gestion des commerciaux par région';
+      case USER_ROLES.SALES_MANAGER:
+        return 'Directeur des Ventes - Gestion des équipes de vente';
+      case USER_ROLES.TEAM_LEADER:
+        return 'Chef d\'Équipe - Supervision des commerciaux';
+      case USER_ROLES.ADMIN:
+        return 'Administrateur - Gestion basique';
+      default:
+        return '';
+    }
+  };
+
+  // Get role badge color
+  const getRoleBadgeColor = (role) => {
+    const colors = {
+      [USER_ROLES.CEO]: 'bg-yellow-100 text-yellow-800',
+      [USER_ROLES.SUPER_ADMIN]: 'bg-purple-100 text-purple-800',
+      [USER_ROLES.REGIONAL_MANAGER]: 'bg-purple-100 text-purple-800',
+      [USER_ROLES.SALES_MANAGER]: 'bg-blue-100 text-blue-800',
+      [USER_ROLES.TEAM_LEADER]: 'bg-green-100 text-green-800',
+      [USER_ROLES.ADMIN]: 'bg-gray-100 text-gray-800'
+    };
+    return colors[role] || colors[USER_ROLES.ADMIN];
+  };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
@@ -170,13 +218,21 @@ const CreateAdminModal = ({ onClose, onSuccess }) => {
         <div className="p-6 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
-                <Shield className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+              <div className={`p-2 rounded-lg ${hasFullAccess ? 'bg-purple-100 dark:bg-purple-900/20' : 'bg-blue-100 dark:bg-blue-900/20'}`}>
+                <Shield className={`h-6 w-6 ${hasFullAccess ? 'text-purple-600 dark:text-purple-400' : 'text-blue-600 dark:text-blue-400'}`} />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  Créer un Administrateur
-                </h3>
+                <div className="flex items-center space-x-2">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Créer un Administrateur
+                  </h3>
+                  {hasFullAccess && (
+                    <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400">
+                      <Star className="h-3 w-3 mr-1" />
+                      Accès complet
+                    </span>
+                  )}
+                </div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
                   Ajoutez un nouveau membre à votre équipe administrative
                 </p>
@@ -377,12 +433,17 @@ const CreateAdminModal = ({ onClose, onSuccess }) => {
                     <option value="">Sélectionner un rôle</option>
                     {assignableRoles.map(role => (
                       <option key={role} value={role}>
-                        {ROLE_LABELS[role]}
+                        {ROLE_LABELS[role]} {role === USER_ROLES.SUPER_ADMIN && '⭐'}
                       </option>
                     ))}
                   </select>
                   {errors.role && (
                     <p className="text-red-600 dark:text-red-400 text-sm mt-1">{errors.role}</p>
+                  )}
+                  {formData.role && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      {getRoleDescription(formData.role)}
+                    </p>
                   )}
                 </div>
 
@@ -401,7 +462,9 @@ const CreateAdminModal = ({ onClose, onSuccess }) => {
                       .filter(manager => manager._id !== user?.id)
                       .map(manager => (
                         <option key={manager._id} value={manager._id}>
-                          {manager.firstName} {manager.lastName} ({ROLE_LABELS[manager.role]})
+                          {manager.firstName} {manager.lastName} 
+                          ({manager.role === 'super_admin' ? 'Super Admin' : ROLE_LABELS[manager.role]})
+                          {manager.role === 'super_admin' && ' ⭐'}
                         </option>
                       ))
                     }
@@ -480,13 +543,22 @@ const CreateAdminModal = ({ onClose, onSuccess }) => {
                 </h4>
                 <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                    Les permissions suivantes seront accordées par défaut pour le rôle <strong>{ROLE_LABELS[formData.role]}</strong>:
+                    Les permissions suivantes seront accordées par défaut pour le rôle <strong className={getRoleBadgeColor(formData.role)}>
+                      {ROLE_LABELS[formData.role]}
+                    </strong>:
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
                     {formData.role === USER_ROLES.CEO && (
                       <div className="col-span-2 text-center py-2 bg-yellow-100 dark:bg-yellow-900/20 rounded">
                         <span className="text-yellow-800 dark:text-yellow-200 font-medium">
                           🔑 Toutes les permissions (CEO)
+                        </span>
+                      </div>
+                    )}
+                    {formData.role === USER_ROLES.SUPER_ADMIN && (
+                      <div className="col-span-2 text-center py-2 bg-purple-100 dark:bg-purple-900/20 rounded">
+                        <span className="text-purple-800 dark:text-purple-200 font-medium">
+                          ⭐ Toutes les permissions (Super Admin) - Même niveau que PDG
                         </span>
                       </div>
                     )}
@@ -545,7 +617,7 @@ const CreateAdminModal = ({ onClose, onSuccess }) => {
             <button
               type="submit"
               disabled={loading || emailChecking}
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors flex items-center space-x-2"
+              className={`px-6 py-3 ${hasFullAccess ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'} text-white rounded-lg disabled:opacity-50 transition-colors flex items-center space-x-2`}
             >
               {loading ? (
                 <>
@@ -554,7 +626,11 @@ const CreateAdminModal = ({ onClose, onSuccess }) => {
                 </>
               ) : (
                 <>
-                  <Shield className="h-4 w-4" />
+                  {formData.role === USER_ROLES.SUPER_ADMIN ? (
+                    <Star className="h-4 w-4" />
+                  ) : (
+                    <Shield className="h-4 w-4" />
+                  )}
                   <span>Créer l'Administrateur</span>
                 </>
               )}

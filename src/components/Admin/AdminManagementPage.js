@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Filter, Eye, Edit, UserX, UserCheck, Shield, Users, Crown, Trash2, TrendingUp, TrendingDown } from 'lucide-react';
+import { Plus, Search, Filter, Eye, Edit, UserX, UserCheck, Shield, Users, Crown, Trash2, TrendingUp, TrendingDown, Star } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { authService } from '../../services/auth.service';
-import { promotionService } from '../../services/promotion.service'; // NEW
+import { promotionService } from '../../services/promotion.service';
 import { hasPermission } from '../../utils/permissions';
 import { formatFullName, formatUserRole } from '../../utils/formatters';
 import { ROLE_LABELS } from '../../utils/constants';
@@ -13,8 +13,6 @@ import EditAdminModal from './EditAdminModal';
 import AdminDetailsModal from './AdminDetailsModal';
 import { SectionSpinner } from '../Commons/LoadingSpinner';
 import { useConfirmDialog } from '../Commons/ConfirmDialog';
-
-// ✅ NEW: Import promotion modals
 import PromoteAdminModal from '../Organization/PromoteAdminModal';
 import DemoteAdminModal from '../Organization/DemoteAdminModal';
 
@@ -36,12 +34,13 @@ const AdminManagementPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [hierarchy, setHierarchy] = useState(null);
-
-  // ✅ NEW: Promotion modal states
   const [showPromoteModal, setShowPromoteModal] = useState(false);
   const [showDemoteModal, setShowDemoteModal] = useState(false);
 
   const { ConfirmDialogComponent, confirmAction } = useConfirmDialog();
+
+  // Check if user has full access (CEO or Super Admin)
+  const hasFullAccess = user?.role === 'ceo' || user?.role === 'super_admin';
 
   useEffect(() => {
     loadAdmins();
@@ -98,7 +97,6 @@ const AdminManagementPage = () => {
     loadAdmins();
   };
 
-  // ✅ NEW: Promotion handlers
   const handlePromoteAdmin = (admin) => {
     setSelectedAdmin(admin);
     setShowPromoteModal(true);
@@ -117,18 +115,24 @@ const AdminManagementPage = () => {
     loadHierarchy();
   };
 
-  // ✅ NEW: Check if admin can be promoted/demoted
+  // Updated promotion/demotion checks with super_admin support
   const canPromoteAdmin = (admin) => {
-    if (!hasPermission(user, 'canEditAdmins')) return false;
+    if (!hasFullAccess && !hasPermission(user, 'canEditAdmins')) return false;
     if (admin._id === user._id) return false; // Can't promote yourself
+    
+    // Super Admin and CEO have same level, they can promote each other? No, only CEO can promote to Super Admin
+    if (admin.role === 'super_admin') return false; // Can't promote Super Admin further
     
     const promotionOptions = promotionService.getPromotionOptions(admin.role, user?.role);
     return promotionOptions.length > 0;
   };
 
   const canDemoteAdmin = (admin) => {
-    if (!hasPermission(user, 'canEditAdmins')) return false;
+    if (!hasFullAccess && !hasPermission(user, 'canEditAdmins')) return false;
     if (admin._id === user._id) return false; // Can't demote yourself
+    
+    // Only CEO can demote Super Admin
+    if (admin.role === 'super_admin' && user?.role !== 'ceo') return false;
     if (admin.role === 'ceo') return false; // Can't demote CEO
     
     const demotionOptions = promotionService.getDemotionOptions(admin.role);
@@ -146,6 +150,16 @@ const AdminManagementPage = () => {
   };
 
   const handleSuspend = async (admin) => {
+    // Prevent suspending CEO or Super Admin unless current user is CEO
+    if ((admin.role === 'ceo' || admin.role === 'super_admin') && user?.role !== 'ceo') {
+      await confirmAction(
+        `suspendre ${formatFullName(admin.firstName, admin.lastName)}`,
+        () => {},
+        'Seul le CEO peut suspendre un Super Admin ou le CEO.'
+      );
+      return;
+    }
+
     const confirmed = await confirmAction(
       `suspendre ${formatFullName(admin.firstName, admin.lastName)}`,
       () => {}
@@ -182,6 +196,16 @@ const AdminManagementPage = () => {
   };
 
   const handleDelete = async (admin) => {
+    // Prevent deleting CEO or Super Admin unless current user is CEO
+    if ((admin.role === 'ceo' || admin.role === 'super_admin') && user?.role !== 'ceo') {
+      await confirmAction(
+        `supprimer ${formatFullName(admin.firstName, admin.lastName)}`,
+        () => {},
+        'Seul le CEO peut supprimer un Super Admin ou le CEO.'
+      );
+      return;
+    }
+
     const confirmed = await confirmAction(
       `supprimer définitivement ${formatFullName(admin.firstName, admin.lastName)}`,
       () => {},
@@ -207,11 +231,17 @@ const AdminManagementPage = () => {
     setCurrentPage(1);
   };
 
-  // ✅ ENHANCED: Configuration des colonnes du tableau avec actions de promotion
+  // Enhanced column configuration with super_admin support
   const columns = [
     createColumn.custom('admin', 'Administrateur', (_, row) => (
       <div className="flex items-center">
-        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+          row.role === 'ceo' 
+            ? 'bg-gradient-to-br from-yellow-500 to-orange-600'
+            : row.role === 'super_admin'
+            ? 'bg-gradient-to-br from-purple-500 to-pink-600'
+            : 'bg-gradient-to-br from-blue-500 to-purple-600'
+        }`}>
           <span className="text-sm font-medium text-white">
             {row.firstName?.[0]}{row.lastName?.[0]}
           </span>
@@ -223,6 +253,9 @@ const AdminManagementPage = () => {
             </span>
             {row.role === 'ceo' && (
               <Crown className="h-4 w-4 text-yellow-500" title="CEO" />
+            )}
+            {row.role === 'super_admin' && (
+              <Star className="h-4 w-4 text-purple-500" title="Super Admin" />
             )}
           </div>
           <div className="text-sm text-gray-500 dark:text-gray-400">
@@ -236,12 +269,13 @@ const AdminManagementPage = () => {
       <div>
         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
           row.role === 'ceo' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400' :
+          row.role === 'super_admin' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400' :
           row.role === 'regional_manager' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400' :
           row.role === 'sales_manager' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400' :
           row.role === 'team_leader' ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400' :
           'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400'
         }`}>
-          {formatUserRole(row.role)}
+          {row.role === 'super_admin' ? 'Super Admin' : formatUserRole(row.role)}
         </span>
       </div>
     )),
@@ -269,10 +303,12 @@ const AdminManagementPage = () => {
         {row.permissions && typeof row.permissions === 'object' ? (
           <div>
             <div className="text-sm font-medium text-gray-900 dark:text-white">
-              {Object.values(row.permissions).filter(p => p === true).length} / {Object.keys(row.permissions).length}
+              {(row.role === 'ceo' || row.role === 'super_admin') 
+                ? Object.keys(row.permissions).length 
+                : Object.values(row.permissions).filter(p => p === true).length} / {Object.keys(row.permissions).length}
             </div>
             <div className="text-sm text-gray-500 dark:text-gray-400">
-              permissions
+              {(row.role === 'ceo' || row.role === 'super_admin') ? 'toutes les permissions (automatique)' : 'permissions'}
             </div>
           </div>
         ) : (
@@ -286,6 +322,9 @@ const AdminManagementPage = () => {
         {row.managedBy ? (
           <div className="text-sm text-gray-900 dark:text-white">
             ⬆️ {formatFullName(row.managedBy.firstName, row.managedBy.lastName)}
+            {row.managedBy.role === 'super_admin' && (
+              <span className="ml-1 text-xs text-purple-500">(Super Admin)</span>
+            )}
           </div>
         ) : (
           <span className="text-sm text-gray-500 dark:text-gray-400">Niveau supérieur</span>
@@ -322,7 +361,7 @@ const AdminManagementPage = () => {
           <Eye className="h-4 w-4" />
         </button>
 
-        {/* ✅ NEW: Promotion button */}
+        {/* Promotion button - only for non-super_admin and non-ceo */}
         {canPromoteAdmin(row) && (
           <button
             onClick={(e) => {
@@ -336,7 +375,7 @@ const AdminManagementPage = () => {
           </button>
         )}
 
-        {/* ✅ NEW: Demotion button */}
+        {/* Demotion button */}
         {canDemoteAdmin(row) && (
           <button
             onClick={(e) => {
@@ -350,7 +389,8 @@ const AdminManagementPage = () => {
           </button>
         )}
         
-        {hasPermission(user, 'canEditAdmins') && row._id !== user._id && (
+        {/* Edit button */}
+        {(hasFullAccess || hasPermission(user, 'canEditAdmins')) && row._id !== user._id && (
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -363,7 +403,8 @@ const AdminManagementPage = () => {
           </button>
         )}
         
-        {hasPermission(user, 'canEditAdmins') && row._id !== user._id && row.role !== 'ceo' && (
+        {/* Suspend/Unsuspend buttons */}
+        {(hasFullAccess || hasPermission(user, 'canEditAdmins')) && row._id !== user._id && row.role !== 'ceo' && (
           <>
             {row.isActive && !row.isSuspended ? (
               <button
@@ -391,7 +432,8 @@ const AdminManagementPage = () => {
           </>
         )}
         
-        {hasPermission(user, 'canDeleteAdmins') && row._id !== user._id && row.role !== 'ceo' && (
+        {/* Delete button */}
+        {(hasFullAccess || hasPermission(user, 'canDeleteAdmins')) && row._id !== user._id && row.role !== 'ceo' && (
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -413,7 +455,7 @@ const AdminManagementPage = () => {
 
   return (
     <div className="space-y-6">
-      {/* En-tête avec actions */}
+      {/* Header with actions */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
         <div>
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
@@ -424,7 +466,7 @@ const AdminManagementPage = () => {
           </p>
         </div>
         
-        {hasPermission(user, 'canCreateAdmins') && (
+        {(hasFullAccess || hasPermission(user, 'canCreateAdmins')) && (
           <button
             onClick={() => setShowCreateModal(true)}
             className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center space-x-2 transition-colors"
@@ -435,7 +477,7 @@ const AdminManagementPage = () => {
         )}
       </div>
 
-      {/* Vue d'ensemble de la hiérarchie */}
+      {/* Hierarchy overview with super_admin support */}
       {hierarchy && (
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
           <div className="flex items-center mb-4">
@@ -446,10 +488,10 @@ const AdminManagementPage = () => {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Votre position */}
+            {/* Your position */}
             <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
               <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                {formatUserRole(user?.role)}
+                {user?.role === 'super_admin' ? 'Super Admin' : formatUserRole(user?.role)}
               </div>
               <div className="text-sm text-blue-800 dark:text-blue-200">
                 Votre rôle
@@ -457,9 +499,15 @@ const AdminManagementPage = () => {
               <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">
                 {user?.firstName} {user?.lastName}
               </div>
+              {user?.role === 'super_admin' && (
+                <div className="mt-2 text-xs text-purple-600 dark:text-purple-400 flex items-center justify-center">
+                  <Star className="h-3 w-3 mr-1" />
+                  Niveau Super Admin
+                </div>
+              )}
             </div>
 
-            {/* Vos subordonnés directs */}
+            {/* Your direct subordinates */}
             <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
               <div className="text-2xl font-bold text-green-600 dark:text-green-400">
                 {hierarchy.subordinates?.admins?.length || 0}
@@ -469,7 +517,7 @@ const AdminManagementPage = () => {
               </div>
             </div>
 
-            {/* Total dans l'organisation */}
+            {/* Total in organization */}
             <div className="text-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
               <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
                 {totalCount}
@@ -482,11 +530,11 @@ const AdminManagementPage = () => {
         </div>
       )}
 
-      {/* Filtres et recherche */}
+      {/* Filters and search */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
         <div className="flex flex-col lg:flex-row space-y-4 lg:space-y-0 lg:space-x-4">
           
-          {/* Barre de recherche */}
+          {/* Search bar */}
           <div className="flex-1">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -500,7 +548,7 @@ const AdminManagementPage = () => {
             </div>
           </div>
 
-          {/* Filtres */}
+          {/* Filters */}
           <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
             <select
               value={filters.role}
@@ -508,9 +556,16 @@ const AdminManagementPage = () => {
               className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
             >
               <option value="">Tous les rôles</option>
-              {Object.entries(ROLE_LABELS).map(([role, label]) => (
-                <option key={role} value={role}>{label}</option>
-              ))}
+              <option value="ceo">CEO</option>
+              <option value="super_admin">Super Admin</option>
+              {Object.entries(ROLE_LABELS).map(([role, label]) => {
+                if (role !== 'ceo' && role !== 'super_admin') {
+                  return (
+                    <option key={role} value={role}>{label}</option>
+                  );
+                }
+                return null;
+              })}
             </select>
             
             <select
@@ -533,7 +588,7 @@ const AdminManagementPage = () => {
             />
           </div>
 
-          {/* Actions de filtre */}
+          {/* Filter actions */}
           <div className="flex space-x-2">
             <button
               onClick={clearFilters}
@@ -545,7 +600,7 @@ const AdminManagementPage = () => {
         </div>
       </div>
 
-      {/* Tableau des administrateurs */}
+      {/* Admin table */}
       <Table
         data={admins}
         columns={columns}
@@ -605,7 +660,6 @@ const AdminManagementPage = () => {
         />
       )}
 
-      {/* ✅ NEW: Promotion Modals */}
       {showPromoteModal && selectedAdmin && (
         <PromoteAdminModal
           admin={selectedAdmin}
@@ -628,7 +682,6 @@ const AdminManagementPage = () => {
         />
       )}
 
-      {/* Dialog de confirmation */}
       <ConfirmDialogComponent />
     </div>
   );

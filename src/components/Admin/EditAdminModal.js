@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, AlertCircle, User, Mail, MapPin, Building, Shield } from 'lucide-react';
+import { X, Save, AlertCircle, User, Mail, MapPin, Building, Shield, Star } from 'lucide-react';
 import { authService } from '../../services/auth.service';
 import { formatFullName } from '../../utils/formatters';
-import { ROLE_LABELS } from '../../utils/constants';
+import { ROLE_LABELS, USER_ROLES } from '../../utils/constants';
+import { useAuth } from '../../hooks/useAuth';
 
 const EditAdminModal = ({ admin, onClose, onSuccess }) => {
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -17,6 +19,13 @@ const EditAdminModal = ({ admin, onClose, onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [availableManagers, setAvailableManagers] = useState([]);
+
+  // Check if user has full access (CEO or Super Admin)
+  const hasFullAccess = user?.role === 'ceo' || user?.role === 'super_admin';
+  // Check if editing self
+  const isEditingSelf = admin?._id === user?._id;
+  // Check if editing a Super Admin
+  const isEditingSuperAdmin = admin?.role === 'super_admin';
 
   useEffect(() => {
     if (admin) {
@@ -128,6 +137,7 @@ const EditAdminModal = ({ admin, onClose, onSuccess }) => {
   const getRoleLevel = (role) => {
     const levels = {
       'ceo': 1,
+      'super_admin': 1,
       'regional_manager': 2,
       'sales_manager': 3,
       'team_leader': 4,
@@ -138,11 +148,33 @@ const EditAdminModal = ({ admin, onClose, onSuccess }) => {
 
   // Filter available roles based on current user permissions
   const getAvailableRoles = () => {
-    return Object.entries(ROLE_LABELS).filter(([role]) => {
-      // For this demo, allow all roles except CEO change
+    const allRoles = Object.entries(ROLE_LABELS);
+    
+    return allRoles.filter(([role]) => {
+      // Can't change CEO role unless user is CEO and not editing self
+      if (admin.role === 'ceo' && !hasFullAccess) return false;
       if (admin.role === 'ceo' && role !== 'ceo') return false;
+      
+      // Super Admin can only be modified by full access users
+      if (isEditingSuperAdmin && !hasFullAccess) return false;
+      
+      // Regular users can't promote to Super Admin
+      if (role === 'super_admin' && !hasFullAccess) return false;
+      
       return true;
     });
+  };
+
+  const getRoleBadgeColor = (role) => {
+    const colors = {
+      'ceo': 'bg-yellow-100 text-yellow-800',
+      'super_admin': 'bg-purple-100 text-purple-800',
+      'regional_manager': 'bg-purple-100 text-purple-800',
+      'sales_manager': 'bg-blue-100 text-blue-800',
+      'team_leader': 'bg-green-100 text-green-800',
+      'admin': 'bg-gray-100 text-gray-800'
+    };
+    return colors[role] || colors.admin;
   };
 
   return (
@@ -153,13 +185,29 @@ const EditAdminModal = ({ admin, onClose, onSuccess }) => {
         <div className="p-6 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
-                <User className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                isEditingSuperAdmin 
+                  ? 'bg-purple-100 dark:bg-purple-900/20' 
+                  : 'bg-blue-100 dark:bg-blue-900/20'
+              }`}>
+                {isEditingSuperAdmin ? (
+                  <Star className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                ) : (
+                  <User className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                )}
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  Modifier Administrateur
-                </h3>
+                <div className="flex items-center space-x-2">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Modifier Administrateur
+                  </h3>
+                  {isEditingSuperAdmin && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400">
+                      <Star className="h-3 w-3 mr-1" />
+                      Super Admin
+                    </span>
+                  )}
+                </div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
                   {formatFullName(admin?.firstName, admin?.lastName)}
                 </p>
@@ -281,17 +329,24 @@ const EditAdminModal = ({ admin, onClose, onSuccess }) => {
                       ? 'border-red-300 dark:border-red-600' 
                       : 'border-gray-300 dark:border-gray-600'
                   }`}
-                  disabled={loading}
+                  disabled={loading || (isEditingSuperAdmin && !hasFullAccess)}
                 >
                   <option value="">Sélectionner un rôle</option>
                   {getAvailableRoles().map(([role, label]) => (
-                    <option key={role} value={role}>{label}</option>
+                    <option key={role} value={role}>
+                      {label} {role === 'super_admin' && '⭐'}
+                    </option>
                   ))}
                 </select>
                 {errors.role && (
                   <p className="text-red-600 dark:text-red-400 text-sm mt-1 flex items-center">
                     <AlertCircle className="w-3 h-3 mr-1" />
                     {errors.role}
+                  </p>
+                )}
+                {formData.role === 'super_admin' && (
+                  <p className="text-xs text-purple-600 dark:text-purple-400 mt-1">
+                    ⭐ Super Admin - Accès complet à toutes les fonctionnalités (même niveau que PDG)
                   </p>
                 )}
               </div>
@@ -304,17 +359,21 @@ const EditAdminModal = ({ admin, onClose, onSuccess }) => {
                   value={formData.managedBy}
                   onChange={(e) => handleInputChange('managedBy', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                  disabled={loading}
+                  disabled={loading || formData.role === 'super_admin' || formData.role === 'ceo'}
                 >
                   <option value="">Aucun manager (niveau supérieur)</option>
                   {availableManagers.map(manager => (
                     <option key={manager._id} value={manager._id}>
-                      {formatFullName(manager.firstName, manager.lastName)} ({ROLE_LABELS[manager.role] || manager.role})
+                      {formatFullName(manager.firstName, manager.lastName)} 
+                      ({manager.role === 'super_admin' ? 'Super Admin' : (ROLE_LABELS[manager.role] || manager.role)})
+                      {manager.role === 'super_admin' && ' ⭐'}
                     </option>
                   ))}
                 </select>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Définit qui supervise cet administrateur dans la hiérarchie
+                  {(formData.role === 'super_admin' || formData.role === 'ceo') 
+                    ? 'Les Super Admins et PDG n\'ont pas de manager' 
+                    : 'Définit qui supervise cet administrateur dans la hiérarchie'}
                 </p>
               </div>
             </div>
@@ -390,7 +449,9 @@ const EditAdminModal = ({ admin, onClose, onSuccess }) => {
             type="button"
             onClick={handleSubmit}
             disabled={loading || Object.keys(errors).length > 0}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center space-x-2 transition-colors"
+            className={`px-6 py-2 ${
+              isEditingSuperAdmin ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'
+            } text-white rounded-lg disabled:opacity-50 flex items-center space-x-2 transition-colors`}
           >
             {loading ? (
               <>

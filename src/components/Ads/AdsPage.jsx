@@ -3,9 +3,11 @@ import {
   Megaphone, Plus, Trash2, Edit3,
   Phone, MessageCircle, Link, Smartphone,
   Clock, Star, AlertCircle, CheckCircle, X, Save,
-  Eye, EyeOff, Upload, Loader,
+  Eye, EyeOff, Upload, Loader, Shield,
 } from 'lucide-react';
 import apiClient from '../../services/api';
+import { useAuth } from '../../hooks/useAuth';
+import { hasPermission } from '../../utils/permissions';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -528,7 +530,7 @@ const AdFormModal = ({ ad, onClose, onSave }) => {
 
 // ─── Ad Card ──────────────────────────────────────────────────────────────────
 
-const AdCard = ({ ad, onEdit, onToggle, onDelete }) => {
+const AdCard = ({ ad, onEdit, onToggle, onDelete, isFullAccess }) => {
   const CtaIcon  = CTA_TYPES.find(c => c.value === ad.ctaType)?.icon || Phone;
   const ctaLabel = CTA_TYPES.find(c => c.value === ad.ctaType)?.label || '';
   const hasImg   = !!ad.logo;
@@ -602,12 +604,14 @@ const AdCard = ({ ad, onEdit, onToggle, onDelete }) => {
           >
             <Edit3 className="h-3.5 w-3.5" /> Modifier
           </button>
-          <button 
-            onClick={() => onDelete(ad)} 
-            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-500 hover:bg-red-100 rounded-lg text-xs font-semibold transition-colors"
-          >
-            <Trash2 className="h-3.5 w-3.5" /> Supprimer
-          </button>
+          {isFullAccess && (
+            <button 
+              onClick={() => onDelete(ad)} 
+              className="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-500 hover:bg-red-100 rounded-lg text-xs font-semibold transition-colors"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> Supprimer
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -617,6 +621,7 @@ const AdCard = ({ ad, onEdit, onToggle, onDelete }) => {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 const AdsPage = () => {
+  const { user } = useAuth();
   const [ads, setAds] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -624,6 +629,9 @@ const AdsPage = () => {
   const [filter, setFilter] = useState('all');
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Check if user has full access (CEO or Super Admin)
+  const hasFullAccess = user?.role === 'ceo' || user?.role === 'super_admin';
 
   const fetchAds = async () => {
     try {
@@ -705,20 +713,33 @@ const AdsPage = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200">
-            <Megaphone className="h-6 w-6 text-white" />
+          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg ${
+            hasFullAccess 
+              ? 'bg-gradient-to-br from-purple-600 to-purple-800 shadow-purple-200'
+              : 'bg-gradient-to-br from-blue-600 to-blue-800 shadow-blue-200'
+          }`}>
+            {hasFullAccess ? (
+              <Shield className="h-6 w-6 text-white" />
+            ) : (
+              <Megaphone className="h-6 w-6 text-white" />
+            )}
           </div>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Publicités</h1>
-            <p className="text-sm text-gray-500">Gérez les bannières publicitaires de l'application</p>
+            <p className="text-sm text-gray-500">
+              Gérez les bannières publicitaires de l'application
+              {hasFullAccess && <span className="text-purple-600 ml-2">(Accès complet)</span>}
+            </p>
           </div>
         </div>
-        <button 
-          onClick={handleNew} 
-          className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-sm"
-        >
-          <Plus className="h-4 w-4" /> Nouvelle publicité
-        </button>
+        {hasFullAccess && (
+          <button 
+            onClick={handleNew} 
+            className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-sm"
+          >
+            <Plus className="h-4 w-4" /> Nouvelle publicité
+          </button>
+        )}
       </div>
 
       {/* Stats */}
@@ -773,7 +794,8 @@ const AdsPage = () => {
               ad={ad} 
               onEdit={handleEdit} 
               onToggle={handleToggle} 
-              onDelete={setDeleteConfirm} 
+              onDelete={setDeleteConfirm}
+              isFullAccess={hasFullAccess}
             />
           ))}
         </div>

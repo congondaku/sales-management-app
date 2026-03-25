@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Menu, Bell, Sun, Moon, Search, User } from 'lucide-react';
+import { Menu, Bell, Sun, Moon, Search, User, Star } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useNotification } from '../../contexts/NotificationContext';
@@ -9,6 +9,26 @@ const Header = ({ title, isSidebarOpen, setIsSidebarOpen }) => {
   const { theme, toggleTheme } = useTheme();
   const { notifications, unreadCount, markAllAsRead } = useNotification();
   const [showNotifications, setShowNotifications] = useState(false);
+
+  // Check if user has full access (CEO or Super Admin)
+  const hasFullAccess = user?.role === 'ceo' || user?.role === 'super_admin';
+  
+  // Get role display name
+  const getRoleDisplay = () => {
+    if (user?.role === 'ceo') return 'PDG';
+    if (user?.role === 'super_admin') return 'Super Admin';
+    if (user?.role === 'regional_manager') return 'Directeur Régional';
+    if (user?.role === 'sales_manager') return 'Directeur des Ventes';
+    if (user?.role === 'team_leader') return 'Chef d\'Équipe';
+    return user?.role || 'Utilisateur';
+  };
+
+  // Get role color for avatar background
+  const getAvatarColor = () => {
+    if (user?.role === 'ceo') return 'bg-gradient-to-br from-yellow-500 to-orange-600';
+    if (user?.role === 'super_admin') return 'bg-gradient-to-br from-purple-500 to-pink-600';
+    return 'bg-blue-600';
+  };
 
   return (
     <header className="bg-white shadow-sm border-b border-gray-200 px-6 py-4 dark:bg-gray-800 dark:border-gray-700">
@@ -22,9 +42,17 @@ const Header = ({ title, isSidebarOpen, setIsSidebarOpen }) => {
           >
             <Menu className="h-6 w-6" />
           </button>
-          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
-            {title}
-          </h1>
+          <div className="flex items-center space-x-2">
+            <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
+              {title}
+            </h1>
+            {hasFullAccess && (
+              <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400">
+                <Star className="h-3 w-3 mr-1" />
+                Accès complet
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Côté droit - Actions */}
@@ -143,18 +171,28 @@ const Header = ({ title, isSidebarOpen, setIsSidebarOpen }) => {
           
           {/* Profil utilisateur */}
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+            <div className={`w-8 h-8 ${getAvatarColor()} rounded-full flex items-center justify-center`}>
               <span className="text-sm font-medium text-white">
                 {user?.firstName?.[0]}{user?.lastName?.[0]}
               </span>
             </div>
             <div className="hidden sm:block">
-              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                {user?.firstName} {user?.lastName}
-              </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                {user?.role === 'ceo' ? 'PDG' : user?.role}
-              </p>
+              <div className="flex items-center space-x-2">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {user?.firstName} {user?.lastName}
+                </p>
+                {hasFullAccess && (
+                  <Star className="h-3 w-3 text-purple-500" />
+                )}
+              </div>
+              <div className="flex items-center space-x-1">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {getRoleDisplay()}
+                </p>
+                {user?.role === 'super_admin' && (
+                  <span className="text-xs text-purple-500">✨</span>
+                )}
+              </div>
             </div>
           </div>
         </div>

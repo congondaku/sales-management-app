@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, TrendingUp, AlertCircle, CheckCircle, Crown, Shield, Users, Target } from 'lucide-react';
+import { X, TrendingUp, AlertCircle, CheckCircle, Crown, Shield, Users, Target, Star } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { promotionService } from '../../services/promotion.service';
 import { authService } from '../../services/auth.service';
@@ -18,6 +18,10 @@ const PromoteAdminModal = ({ admin, onClose, onSuccess }) => {
   });
   const [errors, setErrors] = useState({});
   const [step, setStep] = useState(1); // 1: Role Selection, 2: Details, 3: Confirmation
+
+  // Check if user has full access (CEO only for Super Admin promotion)
+  const hasFullAccess = user?.role === 'ceo' || user?.role === 'super_admin';
+  const canPromoteToSuperAdmin = user?.role === 'ceo';
 
   useEffect(() => {
     loadAvailableAdmins();
@@ -63,19 +67,37 @@ const PromoteAdminModal = ({ admin, onClose, onSuccess }) => {
     if (!admin) return [];
     
     const promotionOptions = promotionService.getPromotionOptions(admin.role, user?.role);
+    
+    // Add Super Admin promotion option if user is CEO and admin is Regional Manager
+    if (canPromoteToSuperAdmin && admin.role === 'regional_manager') {
+      if (!promotionOptions.includes('super_admin')) {
+        promotionOptions.push('super_admin');
+      }
+    }
+    
     const roleLabels = {
       'team_leader': 'Chef d\'Équipe',
       'sales_manager': 'Directeur des Ventes',
       'regional_manager': 'Directeur Régional',
+      'super_admin': 'Super Administrateur',
       'ceo': 'PDG'
+    };
+
+    const roleIcons = {
+      'team_leader': <Target className="w-5 h-5 text-green-500" />,
+      'sales_manager': <Shield className="w-5 h-5 text-blue-500" />,
+      'regional_manager': <Shield className="w-5 h-5 text-purple-500" />,
+      'super_admin': <Star className="w-5 h-5 text-purple-500" />,
+      'ceo': <Crown className="w-5 h-5 text-yellow-500" />
     };
 
     return promotionOptions.map(role => ({
       value: role,
       label: roleLabels[role] || role,
       description: getRoleDescription(role),
-      icon: getRoleIcon(role),
-      level: promotionService.getRoleLevel(role)
+      icon: roleIcons[role] || <Users className="w-5 h-5 text-gray-500" />,
+      level: promotionService.getRoleLevel(role),
+      isSuperAdmin: role === 'super_admin'
     }));
   };
 
@@ -84,23 +106,10 @@ const PromoteAdminModal = ({ admin, onClose, onSuccess }) => {
       'team_leader': 'Gestion d\'une équipe de commerciaux',
       'sales_manager': 'Gestion de plusieurs équipes et territoires',
       'regional_manager': 'Gestion d\'une région complète',
+      'super_admin': 'Super Administrateur - Accès complet à toutes les fonctionnalités (même niveau que PDG)',
       'ceo': 'Direction générale de l\'entreprise'
     };
     return descriptions[role] || '';
-  };
-
-  const getRoleIcon = (role) => {
-    switch (role) {
-      case 'ceo':
-        return <Crown className="w-5 h-5 text-yellow-500" />;
-      case 'regional_manager':
-      case 'sales_manager':
-        return <Shield className="w-5 h-5 text-blue-500" />;
-      case 'team_leader':
-        return <Target className="w-5 h-5 text-green-500" />;
-      default:
-        return <Users className="w-5 h-5 text-gray-500" />;
-    }
   };
 
   const getDefaultPermissionsByRole = (role) => {
@@ -138,6 +147,23 @@ const PromoteAdminModal = ({ admin, onClose, onSuccess }) => {
         canViewAnalytics: true,
         canViewAllData: true,
         canManagePermissions: true
+      },
+      super_admin: {
+        canCreateSalesPeople: true,
+        canEditSalesPeople: true,
+        canDeleteSalesPeople: true,
+        canViewAllSalesPeople: true,
+        canViewCommissions: true,
+        canSetCommissionRates: true,
+        canProcessPayouts: true,
+        canCreateAdmins: true,
+        canEditAdmins: true,
+        canDeleteAdmins: true,
+        canViewAnalytics: true,
+        canViewAllData: true,
+        canManageSystem: true,
+        canManagePermissions: true,
+        canSeeCommissionRates: true
       },
       ceo: {
         canCreateSalesPeople: true,
@@ -220,7 +246,12 @@ const PromoteAdminModal = ({ admin, onClose, onSuccess }) => {
         grantPermissions: formData.grantPermissions
       };
 
-      const response = await promotionService.promoteAdmin(admin._id, promotionData);
+      let response;
+      if (formData.newRole === 'super_admin') {
+        response = await promotionService.promoteToSuperAdmin(admin._id, promotionData);
+      } else {
+        response = await promotionService.promoteAdmin(admin._id, promotionData);
+      }
 
       if (response.success) {
         onSuccess();
@@ -268,29 +299,41 @@ const PromoteAdminModal = ({ admin, onClose, onSuccess }) => {
                       onClick={() => handleInputChange('newRole', role.value)}
                       className={`p-4 border-2 rounded-lg text-left transition-all ${
                         isSelected 
-                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' 
+                          ? role.isSuperAdmin
+                            ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20'
+                            : 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
                           : 'border-gray-200 dark:border-gray-600 hover:border-gray-300'
                       }`}
                     >
                       <div className="flex items-start space-x-3">
                         <div className={`p-2 rounded-lg ${
                           isSelected 
-                            ? 'bg-blue-100 dark:bg-blue-800' 
+                            ? role.isSuperAdmin
+                              ? 'bg-purple-100 dark:bg-purple-800'
+                              : 'bg-blue-100 dark:bg-blue-800'
                             : 'bg-gray-100 dark:bg-gray-700'
                         }`}>
                           {role.icon}
                         </div>
                         <div className="flex-1">
-                          <h5 className="font-medium text-gray-900 dark:text-white">
-                            {role.label}
-                          </h5>
+                          <div className="flex items-center space-x-2">
+                            <h5 className="font-medium text-gray-900 dark:text-white">
+                              {role.label}
+                            </h5>
+                            {role.isSuperAdmin && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400">
+                                <Star className="h-3 w-3 mr-1" />
+                                Niveau PDG
+                              </span>
+                            )}
+                          </div>
                           <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                             {role.description}
                           </p>
                           {isSelected && (
                             <div className="mt-2 flex items-center space-x-2">
-                              <CheckCircle className="w-4 h-4 text-blue-600" />
-                              <span className="text-sm text-blue-600 dark:text-blue-400">
+                              <CheckCircle className={`w-4 h-4 ${role.isSuperAdmin ? 'text-purple-600' : 'text-blue-600'}`} />
+                              <span className={`text-sm ${role.isSuperAdmin ? 'text-purple-600 dark:text-purple-400' : 'text-blue-600 dark:text-blue-400'}`}>
                                 Rôle sélectionné
                               </span>
                             </div>
@@ -352,23 +395,27 @@ const PromoteAdminModal = ({ admin, onClose, onSuccess }) => {
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Manager (optionnel)
-              </label>
-              <select
-                value={formData.managedBy}
-                onChange={(e) => handleInputChange('managedBy', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-              >
-                <option value="">Sélectionner un manager...</option>
-                {availableAdmins.map(availableAdmin => (
-                  <option key={availableAdmin._id} value={availableAdmin._id}>
-                    {availableAdmin.firstName} {availableAdmin.lastName} ({availableAdmin.role})
-                  </option>
-                ))}
-              </select>
-            </div>
+            {!selectedRole?.isSuperAdmin && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Manager (optionnel)
+                </label>
+                <select
+                  value={formData.managedBy}
+                  onChange={(e) => handleInputChange('managedBy', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                >
+                  <option value="">Sélectionner un manager...</option>
+                  {availableAdmins.map(availableAdmin => (
+                    <option key={availableAdmin._id} value={availableAdmin._id}>
+                      {availableAdmin.firstName} {availableAdmin.lastName} 
+                      ({availableAdmin.role === 'super_admin' ? 'Super Admin' : availableAdmin.role})
+                      {availableAdmin.role === 'super_admin' && ' ⭐'}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -412,7 +459,12 @@ const PromoteAdminModal = ({ admin, onClose, onSuccess }) => {
                 </div>
                 <div>
                   <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Nouveau rôle</span>
-                  <p className="text-sm text-gray-900 dark:text-white">{selectedRole?.label}</p>
+                  <div className="flex items-center space-x-2">
+                    <p className="text-sm text-gray-900 dark:text-white">{selectedRole?.label}</p>
+                    {selectedRole?.isSuperAdmin && (
+                      <Star className="h-4 w-4 text-purple-500" />
+                    )}
+                  </div>
                 </div>
                 <div>
                   <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Territoire</span>
@@ -426,15 +478,22 @@ const PromoteAdminModal = ({ admin, onClose, onSuccess }) => {
               </div>
             </div>
 
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <div className={`rounded-lg p-4 ${
+              selectedRole?.isSuperAdmin
+                ? 'bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800'
+                : 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800'
+            }`}>
               <div className="flex items-start space-x-2">
-                <CheckCircle className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5" />
+                <CheckCircle className={`w-5 h-5 ${selectedRole?.isSuperAdmin ? 'text-purple-600 dark:text-purple-400' : 'text-blue-600 dark:text-blue-400'} mt-0.5`} />
                 <div>
-                  <h5 className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                  <h5 className={`text-sm font-medium ${selectedRole?.isSuperAdmin ? 'text-purple-800 dark:text-purple-200' : 'text-blue-800 dark:text-blue-200'}`}>
                     Promotion vers {selectedRole?.label}
                   </h5>
-                  <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
-                    L'administrateur recevra de nouvelles permissions et responsabilités correspondant à son nouveau rôle.
+                  <p className={`text-sm ${selectedRole?.isSuperAdmin ? 'text-purple-700 dark:text-purple-300' : 'text-blue-700 dark:text-blue-300'} mt-1`}>
+                    {selectedRole?.isSuperAdmin
+                      ? `L'administrateur deviendra Super Admin avec toutes les permissions du système, au même niveau que le PDG.`
+                      : `L'administrateur recevra de nouvelles permissions et responsabilités correspondant à son nouveau rôle.`
+                    }
                   </p>
                 </div>
               </div>
@@ -502,7 +561,9 @@ const PromoteAdminModal = ({ admin, onClose, onSuccess }) => {
               <React.Fragment key={stepNumber}>
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
                   stepNumber <= step 
-                    ? 'bg-blue-600 text-white' 
+                    ? selectedRole?.isSuperAdmin && stepNumber === 3
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-blue-600 text-white'
                     : 'bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-400'
                 }`}>
                   {stepNumber < step ? (
@@ -514,7 +575,9 @@ const PromoteAdminModal = ({ admin, onClose, onSuccess }) => {
                 {stepNumber < 3 && (
                   <div className={`flex-1 h-1 rounded ${
                     stepNumber < step 
-                      ? 'bg-blue-600' 
+                      ? selectedRole?.isSuperAdmin && stepNumber === 2
+                        ? 'bg-purple-600'
+                        : 'bg-blue-600'
                       : 'bg-gray-200 dark:bg-gray-600'
                   }`} />
                 )}
@@ -555,7 +618,11 @@ const PromoteAdminModal = ({ admin, onClose, onSuccess }) => {
               <button
                 onClick={handleNext}
                 disabled={loading || (step === 1 && !formData.newRole)}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center space-x-2"
+                className={`px-6 py-2 ${
+                  selectedRole?.isSuperAdmin && step === 1
+                    ? 'bg-purple-600 hover:bg-purple-700'
+                    : 'bg-blue-600 hover:bg-blue-700'
+                } text-white rounded-lg disabled:opacity-50 flex items-center space-x-2`}
               >
                 <span>Suivant</span>
                 <TrendingUp className="w-4 h-4" />
@@ -564,7 +631,11 @@ const PromoteAdminModal = ({ admin, onClose, onSuccess }) => {
               <button
                 onClick={handleSubmit}
                 disabled={loading}
-                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center space-x-2"
+                className={`px-6 py-2 ${
+                  selectedRole?.isSuperAdmin
+                    ? 'bg-purple-600 hover:bg-purple-700'
+                    : 'bg-green-600 hover:bg-green-700'
+                } text-white rounded-lg disabled:opacity-50 flex items-center space-x-2`}
               >
                 {loading ? (
                   <>
