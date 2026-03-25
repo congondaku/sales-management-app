@@ -24,7 +24,7 @@ import {
   Megaphone,
   TrendingUpDown,
   Gift,
-  ClipboardCheck,   // ← NEW
+  ClipboardCheck,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { hasPermission } from '../../utils/permissions';
@@ -46,6 +46,28 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
           description: 'Vue d\'ensemble des performances'
         },
         {
+          id: 'ads',
+          label: 'Publicités',
+          icon: Megaphone,
+          permission: null,
+          description: 'Gérer les bannières publicitaires',
+          ceoOnly: true,
+        },
+        {
+          id: 'property-requests',
+          label: 'Demandes clients',
+          icon: ClipboardCheck,
+          permission: null,
+          description: 'Voir toutes les demandes de propriétés',
+        },
+        {
+          id: 'hotel-kyc',
+          label: 'KYC Hôtels',
+          icon: ClipboardCheck,
+          permission: null,
+          description: 'Vérification des dossiers hôteliers'
+        },
+        {
           id: 'freelistings',
           label: 'Annonces Gratuites',
           icon: Gift,
@@ -65,13 +87,6 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
           icon: TrendingUp,
           permission: null,
           description: 'Performance du site'
-        },
-        {
-          id: 'hotel-kyc',                   // ← NEW
-          label: 'KYC Hôtels',
-          icon: ClipboardCheck,
-          permission: null,
-          description: 'Vérification des dossiers hôteliers'
         },
         {
           id: 'sales-people',
@@ -112,7 +127,7 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
           id: 'settings',
           label: 'Paramètres',
           icon: Settings,
-          permission: null,
+          permission: 'canViewAllData',
           description: 'Configuration du compte'
         }
       ];
@@ -124,6 +139,20 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
           icon: Home,
           permission: null,
           description: 'Vue d\'ensemble de mes performances'
+        },
+        {
+          id: 'hotel-kyc',
+          label: 'KYC Hôtels',
+          icon: ClipboardCheck,
+          permission: null,
+          description: 'Vérifier les dossiers KYC hôteliers'
+        },
+        {
+          id: 'property-requests',
+          label: 'Demandes clients',
+          icon: ClipboardCheck,
+          permission: null,
+          description: 'Voir toutes les demandes de propriétés',
         },
         {
           id: 'freelistings',
@@ -145,13 +174,6 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
           icon: TrendingUp,
           permission: null,
           description: 'Performance du site'
-        },
-        {
-          id: 'hotel-kyc',                   // ← NEW
-          label: 'KYC Hôtels',
-          icon: ClipboardCheck,
-          permission: null,
-          description: 'Vérifier les dossiers KYC hôteliers'
         },
         {
           id: 'register-user',
@@ -186,17 +208,16 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
     return [];
   };
 
+  console.log('Test Youssouf', getMenuItems()[1]);
+
+
   const menuItems = getMenuItems();
 
   const checkPermission = (item) => {
-    if (!item.permission) return true;
-
-    if (isAdmin()) {
-      return hasPermission(user, item.permission);
-    } else if (isSalesPerson()) {
-      return true;
-    }
-
+    if (!item.permission && !item.ceoOnly) return true;
+    if (item.ceoOnly) return user?.role === 'ceo' || user?.role === 'superadmin';
+    if (isAdmin()) return hasPermission(user, item.permission);
+    if (isSalesPerson()) return true;
     return false;
   };
 
@@ -406,17 +427,25 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
                       title={item.description}
                     >
                       <Icon className="h-5 w-5 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
+                      {/* <div className="flex-1 min-w-0">
                         <span className="truncate block">{item.label}</span>
                         {item.permission && isAdmin() && (
                           <span className="text-xs text-gray-400 group-hover:text-gray-300 truncate block">
                             {PERMISSION_LABELS[item.permission]}
                           </span>
                         )}
+                      </div> */}
+                      <div className="flex-1 min-w-0">
+                        <span className="truncate block">{item.label}</span>
+                        {item.permission && isSalesPerson() && (
+                          <span className="text-xs text-gray-400 group-hover:text-gray-300 truncate block">
+                            {getMenuItems()[1]}
+                          </span>
+                        )}
                       </div>
-                      {!item.permission && (
+                      {/* {!item.permission && (
                         <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
-                      )}
+                      )} */}
                     </button>
                   </li>
                 );

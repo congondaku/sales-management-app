@@ -11,6 +11,8 @@ import AnalyticsPage from '../Analytics/AnalyticsPage';
 import UsersPage from '../Users/UsersPage';
 import PermissionsPage from '../Permissions/PermissionsPage';
 import SettingsPage from '../Settings/SettingsPage';
+import AdsPage from '../Ads/AdsPage';
+import PropertyRequestsPage from '../PropertyRequests/PropertyRequestsPage';
 
 // Sales Person Components
 import SalesDashboard from '../Sales/SalesDashboard';
@@ -23,7 +25,7 @@ import Communes from '../Sales/Communes.js'
 import { ListingsManagement } from '@congondaku/listings-management';
 import Home from '../Copied/lib/components/Home/Home.jsx'
 import FreeListingsPage from '../FreeListings/FreeListingsPage';
-import HotelKYCPage from '../HotelKYC/HotelKYCPage'; // ← NEW
+import HotelKYCPage from '../HotelKYC/HotelKYCPage';
 
 
 
@@ -38,6 +40,14 @@ const MainLayout = () => {
         dashboard: {
           title: 'Tableau de Bord',
           component: Dashboard
+        },
+        'ads': {
+          title: 'Publicités',
+          component: AdsPage,
+        },
+        'property-requests': {
+          title: 'Demandes clients',
+          component: PropertyRequestsPage,
         },
         communes: {
           title: 'Communes',
@@ -98,6 +108,10 @@ const MainLayout = () => {
           title: 'Annonces Gratuites',
           component: FreeListingsPage
         },
+        'property-requests': {
+          title: 'Demandes clients',
+          component: PropertyRequestsPage,
+        },
         'annoces': {
           title: 'Annoces',
           component: ListingsManagement
@@ -126,7 +140,7 @@ const MainLayout = () => {
           title: 'Mon Profil',
           component: SalesProfile
         },
-        'hotel-kyc': {                        // ← NEW
+        'hotel-kyc': {
           title: 'KYC Hôtels',
           component: HotelKYCPage
         },
