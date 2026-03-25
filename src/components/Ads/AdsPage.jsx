@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
-  Megaphone, Plus, Trash2, Edit3, ToggleLeft, ToggleRight,
-  ExternalLink, Phone, MessageCircle, Link, Smartphone,
-  Calendar, Clock, Star, AlertCircle, CheckCircle, X, Save,
-  Eye, EyeOff, Image, ChevronDown, ChevronUp
+  Megaphone, Plus, Trash2, Edit3,
+  Phone, MessageCircle, Link, Smartphone,
+  Clock, Star, AlertCircle, CheckCircle, X, Save,
+  Eye, EyeOff, Upload, Loader,
 } from 'lucide-react';
 import apiClient from '../../services/api';
 
@@ -12,8 +12,8 @@ import apiClient from '../../services/api';
 const CTA_TYPES = [
   { value: 'call',      label: 'Appel téléphonique', icon: Phone },
   { value: 'whatsapp',  label: 'WhatsApp',            icon: MessageCircle },
-  { value: 'link',      label: 'Lien externe',         icon: Link },
-  { value: 'internal',  label: 'Écran interne',        icon: Smartphone },
+  { value: 'link',      label: 'Lien externe',        icon: Link },
+  { value: 'internal',  label: 'Écran interne',       icon: Smartphone },
 ];
 
 const EMPTY_FORM = {
@@ -33,10 +33,10 @@ const EMPTY_FORM = {
 // ─── Status Badge ─────────────────────────────────────────────────────────────
 
 const StatusBadge = ({ ad }) => {
-  const now = new Date();
+  const now     = new Date();
   const started = new Date(ad.startDate) <= now;
-  const ended = ad.endDate && new Date(ad.endDate) < now;
-  
+  const ended   = ad.endDate && new Date(ad.endDate) < now;
+
   if (!ad.isActive) return (
     <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">
       <EyeOff className="h-3 w-3" /> Inactif
@@ -59,29 +59,265 @@ const StatusBadge = ({ ad }) => {
   );
 };
 
+// ─── Image Upload Field ───────────────────────────────────────────────────────
+
+const ImageUploadField = ({ value, onChangeImage }) => {
+  const [uploading, setUploading] = useState(false);
+  const [preview, setPreview] = useState(value || '');
+  const [error, setError] = useState('');
+  const fileRef = useRef(null);
+
+  useEffect(() => { 
+    setPreview(value || ''); 
+  }, [value]);
+
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setError('Seuls les fichiers image sont autorisés');
+      return;
+    }
+    
+    // Validate file size (3MB)
+    if (file.size > 3 * 1024 * 1024) {
+      setError('L\'image ne doit pas dépasser 3 Mo');
+      return;
+    }
+    
+    // Show local preview immediately
+    const localUrl = URL.createObjectURL(file);
+    setPreview(localUrl);
+    setError('');
+    
+    try {
+      setUploading(true);
+      const fd = new FormData();
+      fd.append('image', file);
+      
+      const res = await apiClient.post('/ads/upload-image', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      
+      const url = res.data?.data?.imageUrl || res.data?.imageUrl;
+      if (url) { 
+        setPreview(url); 
+        onChangeImage(url);
+        console.log('Image uploaded successfully:', url);
+      } else {
+        throw new Error('No image URL returned');
+      }
+    } catch (err) {
+      console.error('Ad image upload failed:', err);
+      setError(err.response?.data?.message || err.message || 'Échec du téléchargement');
+      // Revert to previous image if upload fails
+      setPreview(value || '');
+    } finally {
+      setUploading(false);
+      // Clean up local object URL
+      URL.revokeObjectURL(localUrl);
+    }
+  };
+
+  const handleUrlChange = (e) => {
+    const url = e.target.value;
+    setPreview(url);
+    onChangeImage(url);
+    setError('');
+  };
+
+  const clearImage = () => {
+    setPreview('');
+    onChangeImage('');
+    if (fileRef.current) fileRef.current.value = '';
+    setError('');
+  };
+
+  return (
+    <div className="space-y-3">
+      <label className="block text-sm font-semibold text-gray-700">Image de fond (optionnel)</label>
+      
+      {error && (
+        <div className="flex items-center gap-2 p-2 bg-red-50 border border-red-200 rounded-lg text-red-700 text-xs">
+          <AlertCircle className="h-3 w-3 flex-shrink-0" />
+          {error}
+        </div>
+      )}
+      
+      <div className="flex gap-2">
+        <input
+          type="text"
+          className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          placeholder="https://example.com/image.jpg ou téléchargez un fichier"
+          value={preview}
+          onChange={handleUrlChange}
+        />
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          disabled={uploading}
+          className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm font-medium text-gray-700 transition-colors disabled:opacity-50"
+        >
+          {uploading ? <Loader className="h-4 w-4 animate-spin" /> : '📁'}
+        </button>
+        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+      </div>
+      
+      {preview && (
+        <div className="relative">
+          <img 
+            src={preview} 
+            alt="Preview" 
+            className="max-h-32 rounded-lg border border-gray-200 object-contain"
+            onError={() => setError('Impossible de charger l\'image')}
+          />
+          <button 
+            type="button" 
+            onClick={clearImage}
+            className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </div>
+      )}
+      
+      <p className="text-xs text-gray-400">
+        Formats acceptés : JPG, PNG, WEBP · Taille max : 3 Mo · Recommandé : 430×64 px
+      </p>
+    </div>
+  );
+};
+
+// ─── Ad Preview Strip ─────────────────────────────────────────────────────────
+
+const AdPreviewStrip = ({ form }) => {
+  const CtaIcon = CTA_TYPES.find(c => c.value === form.ctaType)?.icon || Phone;
+  const hasImg  = !!form.logo;
+
+  return (
+    <div className="rounded-xl overflow-hidden" style={{ height: 64 }}>
+      <div className="relative w-full h-full flex items-center px-3 gap-3"
+        style={{ backgroundColor: hasImg ? 'transparent' : '#0c447b' }}
+      >
+        {hasImg && (
+          <>
+            <img src={form.logo} alt="" className="absolute inset-0 w-full h-full object-cover" />
+            <div className="absolute inset-0" style={{ backgroundColor: 'rgba(0,0,0,0.45)' }} />
+          </>
+        )}
+        <div className="relative z-10 flex items-center gap-3 w-full">
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-bold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.7)' }}>
+              {form.advertiser || 'Annonceur'}
+            </p>
+            <p className="text-white text-xs font-semibold truncate">
+              {form.message || 'Message défilant...'}
+            </p>
+          </div>
+          {form.ctaValue && (
+            <div className="flex-shrink-0 bg-white flex items-center gap-1 px-3 py-1.5 rounded-full">
+              <CtaIcon className="h-3 w-3 text-blue-800" />
+              <span className="text-blue-800 text-xs font-bold">{form.ctaLabel || 'Voir'}</span>
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="h-1 w-full" style={{ backgroundColor: 'rgba(255,255,255,0.25)' }}>
+        <div className="h-full w-1/3 rounded" style={{ backgroundColor: 'rgba(255,255,255,0.9)' }} />
+      </div>
+    </div>
+  );
+};
+
 // ─── Ad Form Modal ────────────────────────────────────────────────────────────
 
 const AdFormModal = ({ ad, onClose, onSave }) => {
-  const [form, setForm]       = useState(ad ? { ...ad, startDate: ad.startDate?.slice(0,10), endDate: ad.endDate?.slice(0,10) || '' } : { ...EMPTY_FORM });
-  const [saving, setSaving]   = useState(false);
-  const [error, setError]     = useState('');
+  const [form, setForm] = useState(ad ? {
+    ...EMPTY_FORM,
+    advertiser: ad.advertiser || '',
+    logo: ad.logo || '',
+    message: ad.message || '',
+    ctaLabel: ad.ctaLabel || 'En savoir plus',
+    ctaType: ad.ctaType || 'call',
+    ctaValue: ad.ctaValue || '',
+    startDate: ad.startDate ? new Date(ad.startDate).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+    endDate: ad.endDate ? new Date(ad.endDate).toISOString().slice(0, 10) : '',
+    priority: ad.priority || 5,
+    displayDurationSeconds: ad.displayDurationSeconds || 10,
+    isActive: ad.isActive !== undefined ? ad.isActive : true,
+  } : { ...EMPTY_FORM });
+  
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
   const set = (field, val) => setForm(f => ({ ...f, [field]: val }));
 
+  const validateForm = () => {
+    if (!form.advertiser.trim()) {
+      setError("Le nom de l'annonceur est requis.");
+      return false;
+    }
+    if (!form.message.trim()) {
+      setError('Le message est requis.');
+      return false;
+    }
+    if (!form.ctaValue.trim()) {
+      setError('La valeur du CTA est requise.');
+      return false;
+    }
+    
+    // Validate CTA value format
+    if (form.ctaType === 'call' || form.ctaType === 'whatsapp') {
+      const phoneRegex = /^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/;
+      if (!phoneRegex.test(form.ctaValue.replace(/\s/g, ''))) {
+        setError('Veuillez entrer un numéro de téléphone valide');
+        return false;
+      }
+    } else if (form.ctaType === 'link') {
+      const urlRegex = /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/;
+      if (!urlRegex.test(form.ctaValue)) {
+        setError('Veuillez entrer une URL valide');
+        return false;
+      }
+    }
+    
+    return true;
+  };
+
   const handleSave = async () => {
-    if (!form.advertiser.trim()) return setError('Le nom de l\'annonceur est requis.');
-    if (!form.message.trim())    return setError('Le message est requis.');
-    if (!form.ctaValue.trim())   return setError('La valeur du CTA est requise.');
+    if (!validateForm()) return;
+    
     setError('');
     try {
       setSaving(true);
+      
+      // Prepare data for submission
+      const submitData = {
+        advertiser: form.advertiser.trim(),
+        logo: form.logo || null,
+        message: form.message.trim(),
+        ctaLabel: form.ctaLabel.trim(),
+        ctaType: form.ctaType,
+        ctaValue: form.ctaValue.trim(),
+        startDate: form.startDate,
+        endDate: form.endDate || null,
+        priority: Number(form.priority),
+        displayDurationSeconds: Number(form.displayDurationSeconds),
+        isActive: form.isActive,
+      };
+      
       if (ad?._id) {
-        await apiClient.patch(`/ads/${ad._id}`, form);
+        await apiClient.patch(`/ads/${ad._id}`, submitData);
       } else {
-        await apiClient.post('/ads', form);
+        await apiClient.post('/ads', submitData);
       }
+      
       onSave();
+      onClose();
     } catch (e) {
+      console.error('Save error:', e);
       setError(e.response?.data?.message || 'Erreur lors de la sauvegarde.');
     } finally {
       setSaving(false);
@@ -93,7 +329,7 @@ const AdFormModal = ({ ad, onClose, onSave }) => {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        
+
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-100">
           <div className="flex items-center gap-3">
@@ -115,32 +351,35 @@ const AdFormModal = ({ ad, onClose, onSave }) => {
         <div className="p-6 space-y-5">
           {error && (
             <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-              <AlertCircle className="h-4 w-4 flex-shrink-0" />
-              {error}
+              <AlertCircle className="h-4 w-4 flex-shrink-0" />{error}
             </div>
           )}
 
-          {/* Advertiser + Logo */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">Annonceur *</label>
-              <input
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Ex: Vodacom, MTN..."
-                value={form.advertiser}
-                onChange={e => set('advertiser', e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">URL du logo</label>
-              <input
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="https://..."
-                value={form.logo}
-                onChange={e => set('logo', e.target.value)}
-              />
-            </div>
+          {/* Live preview */}
+          <div>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Aperçu en temps réel</p>
+            <AdPreviewStrip form={form} />
+            <p className="text-xs text-gray-400 mt-1.5 text-center">
+              Bannière : 64px hauteur · largeur plein écran · {form.displayDurationSeconds}s d'affichage
+            </p>
           </div>
+
+          {/* Advertiser */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Annonceur *</label>
+            <input
+              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Ex: Vodacom, MTN..."
+              value={form.advertiser}
+              onChange={e => set('advertiser', e.target.value)}
+            />
+          </div>
+
+          {/* Image upload */}
+          <ImageUploadField
+            value={form.logo}
+            onChangeImage={v => set('logo', v)}
+          />
 
           {/* Message */}
           <div>
@@ -149,7 +388,7 @@ const AdFormModal = ({ ad, onClose, onSave }) => {
             </label>
             <textarea
               className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-              rows={2}
+              rows={2} 
               maxLength={200}
               placeholder="Le message qui défile sur la bannière..."
               value={form.message}
@@ -159,7 +398,7 @@ const AdFormModal = ({ ad, onClose, onSave }) => {
 
           {/* CTA */}
           <div className="bg-gray-50 rounded-xl p-4 space-y-3">
-            <p className="text-sm font-semibold text-gray-700">Bouton d'action (CTA)</p>
+            <p className="text-sm font-semibold text-gray-700">Bouton d'action (CTA) *</p>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Label du bouton</label>
@@ -177,24 +416,22 @@ const AdFormModal = ({ ad, onClose, onSave }) => {
                   value={form.ctaType}
                   onChange={e => set('ctaType', e.target.value)}
                 >
-                  {CTA_TYPES.map(c => (
-                    <option key={c.value} value={c.value}>{c.label}</option>
-                  ))}
+                  {CTA_TYPES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
                 </select>
               </div>
             </div>
             <div>
               <label className="block text-xs text-gray-500 mb-1">
-                {form.ctaType === 'call' || form.ctaType === 'whatsapp' ? 'Numéro de téléphone *' :
-                 form.ctaType === 'link' ? 'URL *' : 'Nom de l\'écran *'}
+                {form.ctaType === 'call' || form.ctaType === 'whatsapp' ? 'Numéro de téléphone *'
+                  : form.ctaType === 'link' ? 'URL *' : "Nom de l'écran *"}
               </label>
               <div className="relative">
                 <CtaIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
                   className="w-full border border-gray-200 rounded-lg pl-9 pr-4 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder={
-                    form.ctaType === 'call' || form.ctaType === 'whatsapp' ? '+243...' :
-                    form.ctaType === 'link' ? 'https://...' : 'Ex: HotelDetail'
+                    form.ctaType === 'call' || form.ctaType === 'whatsapp' ? '+243...'
+                    : form.ctaType === 'link' ? 'https://...' : 'Ex: HotelDetail'
                   }
                   value={form.ctaValue}
                   onChange={e => set('ctaValue', e.target.value)}
@@ -207,43 +444,45 @@ const AdFormModal = ({ ad, onClose, onSave }) => {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1.5">Date de début</label>
-              <input
-                type="date"
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={form.startDate}
-                onChange={e => set('startDate', e.target.value)}
+              <input 
+                type="date" 
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                value={form.startDate} 
+                onChange={e => set('startDate', e.target.value)} 
               />
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1.5">Date de fin <span className="text-gray-400 font-normal">(vide = indéfini)</span></label>
-              <input
-                type="date"
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={form.endDate}
-                onChange={e => set('endDate', e.target.value)}
+              <input 
+                type="date" 
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                value={form.endDate} 
+                onChange={e => set('endDate', e.target.value)} 
               />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                Durée d'affichage: <span className="text-blue-600">{form.displayDurationSeconds}s</span>
-              </label>
-              <input
-                type="range" min={5} max={30} step={1}
-                className="w-full accent-blue-600"
-                value={form.displayDurationSeconds}
-                onChange={e => set('displayDurationSeconds', Number(e.target.value))}
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">Durée d'affichage: <span className="text-blue-600">{form.displayDurationSeconds}s</span></label>
+              <input 
+                type="range" 
+                min={5} 
+                max={30} 
+                step={1} 
+                className="w-full accent-blue-600" 
+                value={form.displayDurationSeconds} 
+                onChange={e => set('displayDurationSeconds', Number(e.target.value))} 
               />
               <div className="flex justify-between text-xs text-gray-400 mt-1"><span>5s</span><span>30s</span></div>
             </div>
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                Priorité: <span className="text-blue-600">{form.priority}/10</span>
-              </label>
-              <input
-                type="range" min={1} max={10} step={1}
-                className="w-full accent-blue-600"
-                value={form.priority}
-                onChange={e => set('priority', Number(e.target.value))}
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">Priorité: <span className="text-blue-600">{form.priority}/10</span></label>
+              <input 
+                type="range" 
+                min={1} 
+                max={10} 
+                step={1} 
+                className="w-full accent-blue-600" 
+                value={form.priority} 
+                onChange={e => set('priority', Number(e.target.value))} 
               />
               <div className="flex justify-between text-xs text-gray-400 mt-1"><span>Faible</span><span>Haute</span></div>
             </div>
@@ -255,8 +494,9 @@ const AdFormModal = ({ ad, onClose, onSave }) => {
               <p className="text-sm font-semibold text-gray-700">Activer immédiatement</p>
               <p className="text-xs text-gray-500">La publicité sera visible sur l'app dès la sauvegarde</p>
             </div>
-            <button
-              onClick={() => set('isActive', !form.isActive)}
+            <button 
+              type="button"
+              onClick={() => set('isActive', !form.isActive)} 
               className={`w-12 h-6 rounded-full transition-colors relative ${form.isActive ? 'bg-blue-600' : 'bg-gray-300'}`}
             >
               <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${form.isActive ? 'translate-x-6' : 'translate-x-0.5'}`} />
@@ -266,12 +506,15 @@ const AdFormModal = ({ ad, onClose, onSave }) => {
 
         {/* Footer */}
         <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-100">
-          <button onClick={onClose} className="px-5 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">
+          <button 
+            onClick={onClose} 
+            className="px-5 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
+          >
             Annuler
           </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
+          <button 
+            onClick={handleSave} 
+            disabled={saving} 
             className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-60"
           >
             <Save className="h-4 w-4" />
@@ -286,34 +529,43 @@ const AdFormModal = ({ ad, onClose, onSave }) => {
 // ─── Ad Card ──────────────────────────────────────────────────────────────────
 
 const AdCard = ({ ad, onEdit, onToggle, onDelete }) => {
-  const CtaIcon = CTA_TYPES.find(c => c.value === ad.ctaType)?.icon || Phone;
+  const CtaIcon  = CTA_TYPES.find(c => c.value === ad.ctaType)?.icon || Phone;
   const ctaLabel = CTA_TYPES.find(c => c.value === ad.ctaType)?.label || '';
+  const hasImg   = !!ad.logo;
 
   return (
     <div className={`bg-white rounded-2xl border transition-all duration-200 hover:shadow-md ${ad.isActive ? 'border-gray-200' : 'border-gray-100 opacity-60'}`}>
+
       {/* Preview strip */}
-      <div className="relative h-16 rounded-t-2xl overflow-hidden bg-gradient-to-r from-blue-900 to-blue-700 flex items-center px-4 gap-3">
-        {ad.logo && (
-          <img src={ad.logo} alt="" className="w-8 h-8 rounded-lg object-cover opacity-30 absolute inset-0 w-full h-full" style={{ objectFit: 'cover', filter: 'blur(4px)' }} />
+      <div className="relative h-16 rounded-t-2xl overflow-hidden flex items-center px-4 gap-3"
+        style={{ backgroundColor: hasImg ? 'transparent' : '#0c447b' }}
+      >
+        {hasImg && (
+          <>
+            <img src={ad.logo} alt="" className="absolute inset-0 w-full h-full object-cover" />
+            <div className="absolute inset-0" style={{ backgroundColor: 'rgba(0,0,0,0.45)' }} />
+          </>
         )}
-        <div className="relative z-10 flex items-center gap-3 w-full">
-          <div>
-            <p className="text-xs text-blue-200 font-semibold uppercase tracking-wider">{ad.advertiser}</p>
-            <p className="text-white text-xs font-medium truncate max-w-xs">{ad.message}</p>
+        <div className="relative z-10 flex items-center gap-3 w-full min-w-0">
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-bold uppercase tracking-wider truncate" style={{ color: 'rgba(255,255,255,0.7)' }}>{ad.advertiser}</p>
+            <p className="text-white text-xs font-medium truncate">{ad.message}</p>
           </div>
-          <div className="ml-auto flex-shrink-0 bg-white text-blue-700 text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1">
-            <CtaIcon className="h-3 w-3" />
-            {ad.ctaLabel}
+          <div className="flex-shrink-0 bg-white flex items-center gap-1 px-2.5 py-1.5 rounded-full">
+            <CtaIcon className="h-3 w-3 text-blue-800" />
+            <span className="text-blue-800 text-xs font-bold whitespace-nowrap">{ad.ctaLabel}</span>
           </div>
         </div>
       </div>
 
       {/* Details */}
       <div className="p-4">
-        <div className="flex items-start justify-between mb-3">
-          <div>
-            <h3 className="font-bold text-gray-900">{ad.advertiser}</h3>
-            <p className="text-xs text-gray-500 mt-0.5">{ctaLabel} · {ad.ctaValue}</p>
+        <div className="flex items-start justify-between gap-2 mb-3">
+          <div className="min-w-0 flex-1">
+            <h3 className="font-bold text-gray-900 truncate">{ad.advertiser}</h3>
+            <p className="text-xs text-gray-500 mt-0.5 truncate max-w-full" title={ad.ctaValue}>
+              {ctaLabel} · <span className="font-mono">{ad.ctaValue}</span>
+            </p>
           </div>
           <StatusBadge ad={ad} />
         </div>
@@ -338,22 +590,20 @@ const AdCard = ({ ad, onEdit, onToggle, onDelete }) => {
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => onToggle(ad)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-              ad.isActive ? 'bg-gray-100 text-gray-600 hover:bg-gray-200' : 'bg-green-50 text-green-600 hover:bg-green-100'
-            }`}
+          <button 
+            onClick={() => onToggle(ad)} 
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${ad.isActive ? 'bg-gray-100 text-gray-600 hover:bg-gray-200' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}
           >
             {ad.isActive ? <><EyeOff className="h-3.5 w-3.5" /> Désactiver</> : <><Eye className="h-3.5 w-3.5" /> Activer</>}
           </button>
-          <button
-            onClick={() => onEdit(ad)}
+          <button 
+            onClick={() => onEdit(ad)} 
             className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg text-xs font-semibold transition-colors"
           >
             <Edit3 className="h-3.5 w-3.5" /> Modifier
           </button>
-          <button
-            onClick={() => onDelete(ad)}
+          <button 
+            onClick={() => onDelete(ad)} 
             className="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-500 hover:bg-red-100 rounded-lg text-xs font-semibold transition-colors"
           >
             <Trash2 className="h-3.5 w-3.5" /> Supprimer
@@ -367,33 +617,41 @@ const AdCard = ({ ad, onEdit, onToggle, onDelete }) => {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 const AdsPage = () => {
-  const [ads, setAds]             = useState([]);
-  const [loading, setLoading]     = useState(true);
+  const [ads, setAds] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingAd, setEditingAd] = useState(null);
-  const [filter, setFilter]       = useState('all'); // all | active | inactive | expired
+  const [filter, setFilter] = useState('all');
   const [deleteConfirm, setDeleteConfirm] = useState(null);
-  const [deleting, setDeleting]   = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchAds = async () => {
     try {
       setLoading(true);
       const res = await apiClient.get('/ads/all');
       setAds(res.data?.data || []);
-    } catch (e) {
+    } catch (e) { 
       console.error('AdsPage fetch:', e);
-    } finally {
-      setLoading(false);
+      if (e.response?.status === 403) {
+        alert('Accès non autorisé. Veuillez vous connecter avec un compte administrateur.');
+      }
+    } finally { 
+      setLoading(false); 
     }
   };
 
-  useEffect(() => { fetchAds(); }, []);
+  useEffect(() => { 
+    fetchAds(); 
+  }, []);
 
   const handleToggle = async (ad) => {
-    try {
-      await apiClient.patch(`/ads/${ad._id}/toggle`);
-      fetchAds();
-    } catch (e) { console.error(e); }
+    try { 
+      await apiClient.patch(`/ads/${ad._id}/toggle`); 
+      await fetchAds(); 
+    } catch (e) { 
+      console.error('Toggle error:', e);
+      alert('Erreur lors de la modification du statut');
+    }
   };
 
   const handleDelete = async () => {
@@ -402,14 +660,30 @@ const AdsPage = () => {
       setDeleting(true);
       await apiClient.delete(`/ads/${deleteConfirm._id}`);
       setDeleteConfirm(null);
-      fetchAds();
-    } catch (e) { console.error(e); }
-    finally { setDeleting(false); }
+      await fetchAds();
+    } catch (e) { 
+      console.error('Delete error:', e);
+      alert('Erreur lors de la suppression');
+    } finally { 
+      setDeleting(false); 
+    }
   };
 
-  const handleEdit = (ad) => { setEditingAd(ad); setShowModal(true); };
-  const handleNew  = () => { setEditingAd(null); setShowModal(true); };
-  const handleSave = () => { setShowModal(false); setEditingAd(null); fetchAds(); };
+  const handleEdit = (ad) => { 
+    setEditingAd(ad); 
+    setShowModal(true); 
+  };
+  
+  const handleNew = () => { 
+    setEditingAd(null); 
+    setShowModal(true); 
+  };
+  
+  const handleSave = () => { 
+    setShowModal(false); 
+    setEditingAd(null); 
+    fetchAds(); 
+  };
 
   const now = new Date();
   const filteredAds = ads.filter(ad => {
@@ -428,7 +702,6 @@ const AdsPage = () => {
 
   return (
     <div className="space-y-6">
-
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -440,8 +713,8 @@ const AdsPage = () => {
             <p className="text-sm text-gray-500">Gérez les bannières publicitaires de l'application</p>
           </div>
         </div>
-        <button
-          onClick={handleNew}
+        <button 
+          onClick={handleNew} 
           className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-sm"
         >
           <Plus className="h-4 w-4" /> Nouvelle publicité
@@ -455,7 +728,7 @@ const AdsPage = () => {
           { label: 'En ligne', value: stats.active,   color: 'bg-green-50 border-green-200', text: 'text-green-700' },
           { label: 'Inactifs', value: stats.inactive, color: 'bg-gray-50 border-gray-200',   text: 'text-gray-600' },
           { label: 'Expirés',  value: stats.expired,  color: 'bg-red-50 border-red-200',     text: 'text-red-600' },
-        ].map((s) => (
+        ].map(s => (
           <div key={s.label} className={`${s.color} border rounded-2xl p-4 text-center`}>
             <p className={`text-3xl font-bold ${s.text}`}>{s.value}</p>
             <p className="text-xs text-gray-500 mt-1 font-medium">{s.label}</p>
@@ -464,28 +737,24 @@ const AdsPage = () => {
       </div>
 
       {/* Filter tabs */}
-      <div className="flex gap-2 border-b border-gray-200 pb-0">
+      <div className="flex gap-2 border-b border-gray-200">
         {[
           { key: 'all',      label: `Toutes (${stats.total})` },
           { key: 'active',   label: `En ligne (${stats.active})` },
           { key: 'inactive', label: `Inactives (${stats.inactive})` },
           { key: 'expired',  label: `Expirées (${stats.expired})` },
         ].map(tab => (
-          <button
-            key={tab.key}
+          <button 
+            key={tab.key} 
             onClick={() => setFilter(tab.key)}
-            className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px ${
-              filter === tab.key
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
+            className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px ${filter === tab.key ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
           >
             {tab.label}
           </button>
         ))}
       </div>
 
-      {/* Ads grid */}
+      {/* Grid */}
       {loading ? (
         <div className="flex items-center justify-center h-48">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
@@ -499,12 +768,12 @@ const AdsPage = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filteredAds.map(ad => (
-            <AdCard
-              key={ad._id}
-              ad={ad}
-              onEdit={handleEdit}
-              onToggle={handleToggle}
-              onDelete={setDeleteConfirm}
+            <AdCard 
+              key={ad._id} 
+              ad={ad} 
+              onEdit={handleEdit} 
+              onToggle={handleToggle} 
+              onDelete={setDeleteConfirm} 
             />
           ))}
         </div>
@@ -512,10 +781,13 @@ const AdsPage = () => {
 
       {/* Modals */}
       {showModal && (
-        <AdFormModal
-          ad={editingAd}
-          onClose={() => { setShowModal(false); setEditingAd(null); }}
-          onSave={handleSave}
+        <AdFormModal 
+          ad={editingAd} 
+          onClose={() => { 
+            setShowModal(false); 
+            setEditingAd(null); 
+          }} 
+          onSave={handleSave} 
         />
       )}
 
@@ -530,10 +802,17 @@ const AdsPage = () => {
               Voulez-vous vraiment supprimer la pub de <strong>{deleteConfirm.advertiser}</strong> ? Cette action est irréversible.
             </p>
             <div className="flex gap-3">
-              <button onClick={() => setDeleteConfirm(null)} className="flex-1 px-4 py-2.5 text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors">
+              <button 
+                onClick={() => setDeleteConfirm(null)} 
+                className="flex-1 px-4 py-2.5 text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
+              >
                 Annuler
               </button>
-              <button onClick={handleDelete} disabled={deleting} className="flex-1 px-4 py-2.5 text-sm font-semibold text-white bg-red-500 hover:bg-red-600 rounded-xl transition-colors disabled:opacity-60">
+              <button 
+                onClick={handleDelete} 
+                disabled={deleting} 
+                className="flex-1 px-4 py-2.5 text-sm font-semibold text-white bg-red-500 hover:bg-red-600 rounded-xl transition-colors disabled:opacity-60"
+              >
                 {deleting ? 'Suppression...' : 'Supprimer'}
               </button>
             </div>
