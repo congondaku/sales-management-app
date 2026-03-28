@@ -8,6 +8,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { userService } from '../../services/user.service';
 import { SectionSpinner } from '../Commons/LoadingSpinner';
 import { formatDate } from '../../utils/helpers';
+import AdminEditUserModal from '../AdminEditUserModal';
 import './UsersPage.css';
 
 const LIMIT = 20;
@@ -22,6 +23,9 @@ const UsersPage = () => {
   const [filterImage, setFilterImage] = useState('all');
   const [selectedUser, setSelectedUser] = useState(null);
   const [showUserModal, setShowUserModal] = useState(false);
+  const [editUserId, setEditUserId] = useState(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [salesPeople, setSalesPeople] = useState([]);
 
   // Server-side pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -58,6 +62,13 @@ const UsersPage = () => {
     }
   };
 
+  useEffect(() => {
+    import('../../services/sales.service')
+      .then(m => m.salesService.getSalesPeople({ limit: 200 }))
+      .then(res => setSalesPeople(res.salesPeople || []))
+      .catch(() => { }); // non-blocking
+  }, []);
+
   // Single consolidated effect — debounces search, immediate on page/filter change
   useEffect(() => {
     const timer = setTimeout(
@@ -73,7 +84,8 @@ const UsersPage = () => {
   };
 
   const handleEditUser = (u) => {
-    console.log('Edit user:', u);
+    setEditUserId(u._id);
+    setShowEditModal(true);
   };
 
   const handleDeleteUser = async (userId) => {
@@ -389,6 +401,23 @@ const UsersPage = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {showEditModal && editUserId && (
+        <AdminEditUserModal
+          userId={editUserId}
+          salesPeopleList={salesPeople}
+          onClose={() => {
+            setShowEditModal(false);
+            setEditUserId(null);
+          }}
+          onSaved={(updatedUser) => {
+            // Refresh the row in the table without a full reload
+            setUsers(prev =>
+              prev.map(u => u._id === updatedUser._id ? { ...u, ...updatedUser } : u)
+            );
+          }}
+        />
       )}
     </>
   );

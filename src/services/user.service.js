@@ -5,6 +5,16 @@ export const userService = {
   // USER MANAGEMENT
   // ================================
 
+
+  async updateUser(id, data) {
+    try {
+      const response = await apiClient.put(`/admin/users/${id}`, data);
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Erreur lors de la mise à jour');
+    }
+  },
+
   // Obtenir tous les utilisateurs
   async getUsers(params = {}) {
     try {
@@ -210,7 +220,7 @@ export const userService = {
   async getUserStats(params = {}) {
     try {
       const users = await this.getUsers({ limit: 1, ...params });
-      
+
       // Calculer des statistiques basiques
       const stats = {
         total: users.total || 0,
@@ -221,7 +231,7 @@ export const userService = {
       // Si on veut des stats détaillées, faire une requête plus large
       if (params.detailed) {
         const allUsers = await this.getUsers({ limit: 1000, ...params });
-        
+
         allUsers.users?.forEach(user => {
           if (user.salesPersonId?.territory) {
             stats.territories.add(user.salesPersonId.territory);
@@ -322,16 +332,16 @@ export const userService = {
   // Formatter le statut utilisateur
   formatUserStatus(user) {
     if (!user) return 'unknown';
-    
+
     if (user.accountStatus) {
       return user.accountStatus;
     }
-    
+
     // Déterminer le statut basé sur les dates
     if (user.lastLogin) {
       const lastLogin = new Date(user.lastLogin);
       const daysSinceLogin = (Date.now() - lastLogin.getTime()) / (1000 * 60 * 60 * 24);
-      
+
       if (daysSinceLogin > 30) {
         return 'inactive';
       } else if (daysSinceLogin > 7) {
@@ -340,7 +350,7 @@ export const userService = {
         return 'active';
       }
     }
-    
+
     return 'new';
   },
 
@@ -354,18 +364,18 @@ export const userService = {
       'suspended': 'red',
       'pending': 'orange'
     };
-    
+
     return colorMap[status] || 'gray';
   },
 
   // Formatter la date de dernière connexion
   formatLastLogin(lastLogin) {
     if (!lastLogin) return 'Jamais connecté';
-    
+
     const loginDate = new Date(lastLogin);
     const now = new Date();
     const diffInDays = Math.floor((now - loginDate) / (1000 * 60 * 60 * 24));
-    
+
     if (diffInDays === 0) {
       return 'Aujourd\'hui';
     } else if (diffInDays === 1) {
@@ -417,7 +427,7 @@ export const userService = {
     try {
       const promises = userIds.map(id => this.deleteUser(id));
       const results = await Promise.allSettled(promises);
-      
+
       const successful = results.filter(r => r.status === 'fulfilled').length;
       const failed = results.filter(r => r.status === 'rejected').length;
 
@@ -443,7 +453,7 @@ export const userService = {
       });
 
       const users = allUsers.users || [];
-      
+
       if (format === 'csv') {
         return this.exportToCSV(users);
       } else if (format === 'json') {
@@ -583,7 +593,7 @@ export const userService = {
   async generateAdminReport(params = {}) {
     try {
       const admins = await this.getAdmins(params);
-      
+
       // Grouper par rôle
       const adminsByRole = {};
       admins.admins?.forEach(admin => {

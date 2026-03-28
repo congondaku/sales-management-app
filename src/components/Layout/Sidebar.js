@@ -66,13 +66,6 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
           description: 'Voir toutes les demandes de propriétés',
         },
         {
-          id: 'hotel-kyc',
-          label: 'KYC Hôtels',
-          icon: ClipboardCheck,
-          permission: null,
-          description: 'Vérification des dossiers hôteliers'
-        },
-        {
           id: 'freelistings',
           label: 'Annonces Gratuites',
           icon: Gift,
