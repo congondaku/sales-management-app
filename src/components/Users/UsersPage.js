@@ -1,395 +1,396 @@
 import React, { useState, useEffect } from 'react';
-import { Search, UserPlus, Mail, Phone, MapPin, Calendar, Edit, Trash2, Eye } from 'lucide-react';
+import {
+  Search, UserPlus, Mail, Phone, Calendar,
+  Edit, Trash2, Eye, X, ChevronLeft, ChevronRight,
+  AlertCircle, RefreshCw
+} from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
-import { userService } from '../../services/user.service'; // Fixed import name
-import usePagination from '../../hooks/usePagination';
+import { userService } from '../../services/user.service';
 import { SectionSpinner } from '../Commons/LoadingSpinner';
 import { formatDate } from '../../utils/helpers';
+import './UsersPage.css';
+
+const LIMIT = 20;
 
 const UsersPage = () => {
-  const { user } = useAuth();
-  const [users, setUsers] = useState([]); // Initialize as empty array
+  const { user: authUser } = useAuth();
+
+  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterImage, setFilterImage] = useState('all');
   const [selectedUser, setSelectedUser] = useState(null);
   const [showUserModal, setShowUserModal] = useState(false);
 
-  // Filter users based on search and status
-  const filteredUsers = users.filter(user => {
-    const matchesSearch = user.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.email?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = filterStatus === 'all' || 
-                         (filterStatus === 'active' && user.isActive) ||
-                         (filterStatus === 'inactive' && !user.isActive);
-    
-    return matchesSearch && matchesStatus;
-  });
+  // Server-side pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
 
-  // Use pagination with filtered users
-  const {
-    currentPage,
-    totalPages,
-    paginatedData,
-    totalItems,
-    goToPage,
-    goToNextPage,
-    goToPreviousPage,
-    hasNextPage,
-    hasPreviousPage
-  } = usePagination(filteredUsers, 10);
-
-  useEffect(() => {
-    loadUsers();
-  }, []);
-
-  const loadUsers = async () => {
+  // Plain async function — no useCallback so it always reads fresh params
+  const loadUsers = async (page, search, imageFilter) => {
     try {
       setLoading(true);
       setError(null);
-      const response = await userService.getUsers(); // Fixed service name
-      
+
+      const response = await userService.getUsers({
+        page,
+        limit: LIMIT,
+        search: search || undefined,
+        hasImage: imageFilter !== 'all' ? String(imageFilter === 'with') : undefined,
+      });
+
       if (response.success) {
-        // Ensure we always set an array
         setUsers(Array.isArray(response.users) ? response.users : []);
+        setTotalPages(response.pagination?.pages ?? 1);
+        setTotalItems(response.total ?? 0);
       } else {
         setError(response.message || 'Erreur lors du chargement des utilisateurs');
-        setUsers([]); // Set empty array on error
+        setUsers([]);
       }
-    } catch (error) {
-      console.error('Erreur lors du chargement des utilisateurs:', error);
+    } catch (err) {
+      console.error('Erreur lors du chargement des utilisateurs:', err);
       setError('Erreur de connexion au serveur');
-      setUsers([]); // Set empty array on error
+      setUsers([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleViewUser = (user) => {
-    setSelectedUser(user);
+  // Single consolidated effect — debounces search, immediate on page/filter change
+  useEffect(() => {
+    const timer = setTimeout(
+      () => loadUsers(currentPage, searchTerm, filterImage),
+      searchTerm ? 400 : 0
+    );
+    return () => clearTimeout(timer);
+  }, [currentPage, searchTerm, filterImage]);
+
+  const handleViewUser = (u) => {
+    setSelectedUser(u);
     setShowUserModal(true);
   };
 
-  const handleEditUser = (user) => {
-    // Implement edit functionality
-    console.log('Edit user:', user);
+  const handleEditUser = (u) => {
+    console.log('Edit user:', u);
   };
 
   const handleDeleteUser = async (userId) => {
-    if (window.confirm('Êtes-vous sûr de vouloir supprimer cet utilisateur ?')) {
-      try {
-        const response = await userService.deleteUser(userId); // Fixed service name
-        if (response.success) {
-          loadUsers(); // Reload users list
-        } else {
-          setError(response.message || 'Erreur lors de la suppression');
-        }
-      } catch (error) {
-        console.error('Erreur lors de la suppression:', error);
-        setError('Erreur lors de la suppression de l\'utilisateur');
+    if (!window.confirm('Êtes-vous sûr de vouloir supprimer cet utilisateur ?')) return;
+    try {
+      const response = await userService.deleteUser(userId);
+      if (response.success) {
+        loadUsers(currentPage, searchTerm, filterImage);
+      } else {
+        setError(response.message || 'Erreur lors de la suppression');
       }
+    } catch (err) {
+      console.error('Erreur lors de la suppression:', err);
+      setError("Erreur lors de la suppression de l'utilisateur");
     }
   };
 
-  if (loading) {
-    return <SectionSpinner text="Chargement des utilisateurs..." />;
-  }
+  const startItem = totalItems === 0 ? 0 : (currentPage - 1) * LIMIT + 1;
+  const endItem = Math.min(currentPage * LIMIT, totalItems);
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-            Gestion des Utilisateurs
-          </h2>
-          <p className="text-gray-600 dark:text-gray-400">
-            Gérez les utilisateurs de la plateforme
-          </p>
-        </div>
-        
-        <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center space-x-2">
-          <UserPlus className="h-4 w-4" />
-          <span>Nouvel Utilisateur</span>
-        </button>
-      </div>
-
-      {/* Error Display */}
-      {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-          <p className="text-red-600 dark:text-red-400">{error}</p>
-          <button
-            onClick={loadUsers}
-            className="mt-2 text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200 underline"
-          >
-            Réessayer
+    <>
+      <div className="up-root">
+        {/* Header */}
+        <div className="up-header">
+          <div>
+            <h2 className="up-title">Utilisateurs</h2>
+            <p className="up-subtitle">Gérez les utilisateurs de la plateforme</p>
+          </div>
+          <button className="up-btn-primary">
+            <UserPlus size={15} />
+            Nouvel Utilisateur
           </button>
         </div>
-      )}
 
-      {/* Filters and Search */}
-      <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
-        <div className="relative flex-1">
-          <Search className="h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Rechercher par nom ou email..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-          />
-        </div>
-        
-        <select
-          value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
-          className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-        >
-          <option value="all">Tous les statuts</option>
-          <option value="active">Actifs</option>
-          <option value="inactive">Inactifs</option>
-        </select>
-      </div>
-
-      {/* Users Table */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className="bg-gray-50 dark:bg-gray-700">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Utilisateur
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Contact
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Commercial
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Inscription
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Statut
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-              {paginatedData.length > 0 ? (
-                paginatedData.map((user) => (
-                  <tr key={user._id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0 h-10 w-10">
-                          <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center">
-                            <span className="text-white font-medium">
-                              {user.firstName?.charAt(0)}{user.lastName?.charAt(0)}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900 dark:text-white">
-                            {user.firstName} {user.lastName}
-                          </div>
-                          <div className="text-sm text-gray-500 dark:text-gray-400">
-                            ID: {user._id}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900 dark:text-white">
-                        <div className="flex items-center">
-                          <Mail className="h-4 w-4 mr-2" />
-                          {user.email}
-                        </div>
-                        {user.phone && (
-                          <div className="flex items-center mt-1">
-                            <Phone className="h-4 w-4 mr-2" />
-                            {user.phone}
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {user.salesPerson ? (
-                        <div>
-                          <div className="font-medium">{user.salesPerson.name}</div>
-                          <div className="text-xs">{user.salesPerson.territory}</div>
-                        </div>
-                      ) : (
-                        'Non assigné'
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      <div className="flex items-center">
-                        <Calendar className="h-4 w-4 mr-2" />
-                        {formatDate(user.createdAt)}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        user.isActive
-                          ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
-                          : 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
-                      }`}>
-                        {user.isActive ? 'Actif' : 'Inactif'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => handleViewUser(user)}
-                          className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleEditUser(user)}
-                          className="text-yellow-600 hover:text-yellow-800 dark:text-yellow-400 dark:hover:text-yellow-200"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteUser(user._id)}
-                          className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-200"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="6" className="px-6 py-12 text-center">
-                    <div className="text-gray-500 dark:text-gray-400">
-                      {searchTerm || filterStatus !== 'all' 
-                        ? 'Aucun utilisateur trouvé avec ces critères'
-                        : 'Aucun utilisateur trouvé'
-                      }
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-500 dark:text-gray-400">
-                Affichage de {((currentPage - 1) * 10) + 1} à {Math.min(currentPage * 10, totalItems)} sur {totalItems} utilisateurs
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={goToPreviousPage}
-                  disabled={!hasPreviousPage}
-                  className="px-3 py-1 border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-700"
-                >
-                  Précédent
-                </button>
-                
-                <span className="text-sm text-gray-500 dark:text-gray-400">
-                  Page {currentPage} sur {totalPages}
-                </span>
-                
-                <button
-                  onClick={goToNextPage}
-                  disabled={!hasNextPage}
-                  className="px-3 py-1 border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-700"
-                >
-                  Suivant
-                </button>
-              </div>
+        {/* Error */}
+        {error && (
+          <div className="up-error">
+            <AlertCircle size={16} color="#dc2626" style={{ flexShrink: 0, marginTop: 2 }} />
+            <div>
+              <p className="up-error-text">{error}</p>
+              <button
+                className="up-error-retry"
+                onClick={() => loadUsers(currentPage, searchTerm, filterImage)}
+              >
+                <RefreshCw size={12} />
+                Réessayer
+              </button>
             </div>
           </div>
         )}
-      </div>
 
-      {/* User Details Modal */}
-      {showUserModal && selectedUser && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full m-4 max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  Détails de l'utilisateur
-                </h3>
+        {/* Filters */}
+        <div className="up-filters">
+          <div className="up-search-wrap">
+            <Search size={15} className="up-search-icon" />
+            <input
+              type="text"
+              placeholder="Rechercher par nom ou email…"
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="up-search-input"
+            />
+          </div>
+
+          <select
+            value={filterImage}
+            onChange={(e) => {
+              setFilterImage(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="up-select"
+          >
+            <option value="all">Toutes les photos</option>
+            <option value="with">Avec photo</option>
+            <option value="without">Sans photo</option>
+          </select>
+        </div>
+
+        {/* Table Card */}
+        <div className="up-card">
+          {loading ? (
+            <div className="up-loading-overlay">
+              <SectionSpinner text="Chargement…" />
+            </div>
+          ) : (
+            <div className="up-table-wrap">
+              <table className="up-table">
+                <thead className="up-thead">
+                  <tr>
+                    <th className="up-th">Utilisateur</th>
+                    <th className="up-th">Contact</th>
+                    <th className="up-th">Commercial</th>
+                    <th className="up-th">Inscription</th>
+                    <th className="up-th">Statut</th>
+                    <th className="up-th">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.length > 0 ? (
+                    users.map((u) => (
+                      <tr key={u._id} className="up-tr">
+                        {/* User */}
+                        <td className="up-td">
+                          <div className="up-user-cell">
+                            <div className="up-avatar">
+                              {u.profileImage ? (
+                                <img
+                                  src={u.profileImage}
+                                  alt={`${u.firstName} ${u.lastName}`}
+                                  className="up-avatar-img"
+                                />
+                              ) : (
+                                <span className="up-avatar-initials">
+                                  {u.firstName?.charAt(0)}{u.lastName?.charAt(0)}
+                                </span>
+                              )}
+                            </div>
+                            <div>
+                              <p className="up-user-name">{u.firstName} {u.lastName}</p>
+                              <p className="up-user-id">{u._id}</p>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Contact */}
+                        <td className="up-td">
+                          <div className="up-contact-item">
+                            <Mail size={13} />
+                            {u.email}
+                          </div>
+                          {u.phoneNumber && (
+                            <div className="up-contact-item">
+                              <Phone size={13} />
+                              {u.phoneNumber}
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Sales person */}
+                        <td className="up-td">
+                          {u.salesPerson ? (
+                            <>
+                              <p className="up-sales-name">{u.salesPerson.name}</p>
+                              <p className="up-sales-territory">{u.salesPerson.territory}</p>
+                            </>
+                          ) : (
+                            <span className="up-unassigned">Non assigné</span>
+                          )}
+                        </td>
+
+                        {/* Date */}
+                        <td className="up-td">
+                          <div className="up-date">
+                            <Calendar size={13} />
+                            {formatDate(u.createdAt)}
+                          </div>
+                        </td>
+
+                        {/* Status */}
+                        <td className="up-td">
+                          <span className={`up-badge ${u.accountStatus === 'active' ? 'up-badge-active' : 'up-badge-inactive'}`}>
+                            {u.accountStatus === 'active' ? 'Actif' : 'Inactif'}
+                          </span>
+                        </td>
+
+                        {/* Actions */}
+                        <td className="up-td">
+                          <div className="up-actions">
+                            <button
+                              className="up-action-btn view"
+                              onClick={() => handleViewUser(u)}
+                              title="Voir"
+                            >
+                              <Eye size={15} />
+                            </button>
+                            <button
+                              className="up-action-btn edit"
+                              onClick={() => handleEditUser(u)}
+                              title="Modifier"
+                            >
+                              <Edit size={15} />
+                            </button>
+                            <button
+                              className="up-action-btn delete"
+                              onClick={() => handleDeleteUser(u._id)}
+                              title="Supprimer"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="6">
+                        <div className="up-empty">
+                          {searchTerm || filterImage !== 'all'
+                            ? 'Aucun utilisateur trouvé avec ces critères'
+                            : 'Aucun utilisateur trouvé'}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Pagination */}
+          {!loading && totalPages > 1 && (
+            <div className="up-pagination">
+              <span className="up-pagination-info">
+                {totalItems === 0
+                  ? 'Aucun résultat'
+                  : `${startItem}–${endItem} sur ${totalItems} utilisateurs`}
+              </span>
+
+              <div className="up-pagination-controls">
                 <button
-                  onClick={() => setShowUserModal(false)}
-                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                  className="up-page-btn"
+                  onClick={() => setCurrentPage((p) => p - 1)}
+                  disabled={currentPage === 1}
                 >
-                  ✕
+                  <ChevronLeft size={14} />
+                  Précédent
+                </button>
+
+                <span className="up-page-label">
+                  {currentPage} / {totalPages}
+                </span>
+
+                <button
+                  className="up-page-btn"
+                  onClick={() => setCurrentPage((p) => p + 1)}
+                  disabled={currentPage === totalPages}
+                >
+                  Suivant
+                  <ChevronRight size={14} />
                 </button>
               </div>
-              
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Prénom
-                    </label>
-                    <p className="text-sm text-gray-900 dark:text-white">{selectedUser.firstName}</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Nom
-                    </label>
-                    <p className="text-sm text-gray-900 dark:text-white">{selectedUser.lastName}</p>
-                  </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* User Detail Modal */}
+      {showUserModal && selectedUser && (
+        <div className="up-overlay" onClick={() => setShowUserModal(false)}>
+          <div className="up-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="up-modal-header">
+              <h3 className="up-modal-title">Détails de l'utilisateur</h3>
+              <button className="up-modal-close" onClick={() => setShowUserModal(false)}>
+                <X size={14} />
+              </button>
+            </div>
+
+            <div className="up-modal-body">
+              <div className="up-modal-avatar">
+                {selectedUser.profileImage ? (
+                  <img
+                    src={selectedUser.profileImage}
+                    alt={`${selectedUser.firstName} ${selectedUser.lastName}`}
+                    className="up-avatar-img"
+                  />
+                ) : (
+                  <span className="up-avatar-initials">
+                    {selectedUser.firstName?.charAt(0)}{selectedUser.lastName?.charAt(0)}
+                  </span>
+                )}
+              </div>
+
+              <div className="up-modal-grid">
+                <div className="up-field">
+                  <label>Prénom</label>
+                  <p>{selectedUser.firstName}</p>
                 </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Email
-                  </label>
-                  <p className="text-sm text-gray-900 dark:text-white">{selectedUser.email}</p>
+                <div className="up-field">
+                  <label>Nom</label>
+                  <p>{selectedUser.lastName}</p>
                 </div>
-                
-                {selectedUser.phone && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Téléphone
-                    </label>
-                    <p className="text-sm text-gray-900 dark:text-white">{selectedUser.phone}</p>
+                <div className="up-field up-field-full">
+                  <label>Email</label>
+                  <p>{selectedUser.email}</p>
+                </div>
+                {selectedUser.phoneNumber && (
+                  <div className="up-field up-field-full">
+                    <label>Téléphone</label>
+                    <p>{selectedUser.phoneNumber}</p>
                   </div>
                 )}
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Date d'inscription
-                  </label>
-                  <p className="text-sm text-gray-900 dark:text-white">{formatDate(selectedUser.createdAt)}</p>
+                <div className="up-field">
+                  <label>Inscription</label>
+                  <p>{formatDate(selectedUser.createdAt)}</p>
                 </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Statut
-                  </label>
-                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                    selectedUser.isActive
-                      ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
-                      : 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
-                  }`}>
-                    {selectedUser.isActive ? 'Actif' : 'Inactif'}
+                <div className="up-field">
+                  <label>Statut</label>
+                  <span className={`up-badge ${selectedUser.accountStatus === 'active' ? 'up-badge-active' : 'up-badge-inactive'}`}>
+                    {selectedUser.accountStatus === 'active' ? 'Actif' : 'Inactif'}
                   </span>
                 </div>
+                {selectedUser.salesPerson && (
+                  <div className="up-field up-field-full">
+                    <label>Commercial</label>
+                    <p>{selectedUser.salesPerson.name} — {selectedUser.salesPerson.territory}</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 };
 

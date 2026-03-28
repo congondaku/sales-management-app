@@ -28,7 +28,7 @@ export const formatPercentage = (value, decimals = 1) => {
 };
 
 // Formatage des dates
-export const formatDate = (date, format = DATE_FORMATS.SHORT) => {
+export const formatDate = (date, format = DATE_FORMATS.WITH_TIME) => {
   if (!date) return '';
   
   const dateObj = typeof date === 'string' ? new Date(date) : date;
