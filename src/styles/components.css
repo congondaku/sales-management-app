@@ -25,7 +25,7 @@
   width: 6px;
 }
 
-.sidebar-nav::-webkit-scrollbar-track {
+/* .sidebar-nav::-webkit-scrollbar-track {
   background: #1e293b;
   border-radius: 3px;
 }
@@ -37,7 +37,7 @@
 
 .sidebar-nav::-webkit-scrollbar-thumb:hover {
   background: #64748b;
-}
+} */
 
 .sidebar-nav-item {
   @apply w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors text-left;
