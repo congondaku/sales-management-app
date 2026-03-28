@@ -212,10 +212,10 @@ const AdPreviewStrip = ({ form }) => {
         <div className="relative z-10 flex items-center gap-3 w-full">
           <div className="flex-1 min-w-0">
             <p className="text-xs font-bold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.7)' }}>
-              {form.advertiser || 'Annonceur'}
+              {form.advertiser || ''}
             </p>
             <p className="text-white text-xs font-semibold truncate">
-              {form.message || 'Message défilant...'}
+              {form.message || ''}
             </p>
           </div>
           {form.ctaValue && (
@@ -257,18 +257,18 @@ const AdFormModal = ({ ad, onClose, onSave }) => {
   const set = (field, val) => setForm(f => ({ ...f, [field]: val }));
 
   const validateForm = () => {
-    if (!form.advertiser.trim()) {
-      setError("Le nom de l'annonceur est requis.");
-      return false;
-    }
-    if (!form.message.trim()) {
-      setError('Le message est requis.');
-      return false;
-    }
-    if (!form.ctaValue.trim()) {
-      setError('La valeur du CTA est requise.');
-      return false;
-    }
+    // if (!form.advertiser.trim()) {
+    //   setError("Le nom de l'annonceur est requis.");
+    //   return false;
+    // }
+    // if (!form.message.trim()) {
+    //   setError('Le message est requis.');
+    //   return false;
+    // }
+    // if (!form.ctaValue.trim()) {
+    //   setError('La valeur du CTA est requise.');
+    //   return false;
+    // }
     
     // Validate CTA value format
     if (form.ctaType === 'call' || form.ctaType === 'whatsapp') {
@@ -368,7 +368,7 @@ const AdFormModal = ({ ad, onClose, onSave }) => {
 
           {/* Advertiser */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Annonceur *</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Annonceur</label>
             <input
               className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="Ex: Vodacom, MTN..."
@@ -386,7 +386,7 @@ const AdFormModal = ({ ad, onClose, onSave }) => {
           {/* Message */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-              Message défilant * <span className="text-gray-400 font-normal">({form.message.length}/200)</span>
+              Message défilant <span className="text-gray-400 font-normal">({form.message.length}/200)</span>
             </label>
             <textarea
               className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
@@ -402,7 +402,7 @@ const AdFormModal = ({ ad, onClose, onSave }) => {
           <div className="bg-gray-50 rounded-xl p-4 space-y-3">
             <p className="text-sm font-semibold text-gray-700">Bouton d'action (CTA) *</p>
             <div className="grid grid-cols-2 gap-3">
-              <div>
+              {/* <div>
                 <label className="block text-xs text-gray-500 mb-1">Label du bouton</label>
                 <input
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -410,7 +410,7 @@ const AdFormModal = ({ ad, onClose, onSave }) => {
                   value={form.ctaLabel}
                   onChange={e => set('ctaLabel', e.target.value)}
                 />
-              </div>
+              </div> */}
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Type</label>
                 <select
