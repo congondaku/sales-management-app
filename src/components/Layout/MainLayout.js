@@ -21,18 +21,19 @@ import MyCommissions from '../Sales/MyCommissions';
 import MyPerformance from '../Sales/MyPerformance';
 import RegisterUser from '../Sales/RegisterUser';
 import SalesProfile from '../Sales/SalesProfile.js';
-import Communes from '../Sales/Communes.js'
+import Communes from '../Sales/Communes.js';
 import { ListingsManagement } from '@congondaku/listings-management';
-import Home from '../Copied/lib/components/Home/Home.jsx'
+import Home from '../Copied/lib/components/Home/Home.jsx';
 import FreeListingsPage from '../FreeListings/FreeListingsPage';
-import HotelKYCPage from '../HotelKYC/HotelKYCPage';
+
+// Hotels — single parent with tabs inside (KYC Queue + Operators)
+import HotelsPage from '../HotelKYC/HotelsPage';
 
 const MainLayout = () => {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { user, userType, isAdmin, isSalesPerson } = useAuth();
 
-  // Check if user has full access (CEO or Super Admin)
   const hasFullAccess = user?.role === 'ceo' || user?.role === 'super_admin';
 
   const getPageConfigurations = () => {
@@ -59,11 +60,11 @@ const MainLayout = () => {
           component: FreeListingsPage
         },
         annoces: {
-          title: 'Annoces',
+          title: 'Annonces',
           component: ListingsManagement
         },
         traffic: {
-          title: "Traffic",
+          title: 'Traffic',
           component: Home
         },
         'sales-people': {
@@ -90,10 +91,11 @@ const MainLayout = () => {
           title: 'Paramètres',
           component: SettingsPage
         },
-        // 'hotel-kyc': {
-        //   title: 'KYC Hôtels',
-        //   component: HotelKYCPage
-        // },
+        // Single entry — tabs inside handle KYC Queue & Operators
+        hotels: {
+          title: 'Hôtels',
+          component: HotelsPage
+        },
       };
     } else if (isSalesPerson()) {
       return {
@@ -114,7 +116,7 @@ const MainLayout = () => {
           component: PropertyRequestsPage,
         },
         'annoces': {
-          title: 'Annoces',
+          title: 'Annonces',
           component: ListingsManagement
         },
         'traffic': {
@@ -141,9 +143,10 @@ const MainLayout = () => {
           title: 'Mon Profil',
           component: SalesProfile
         },
-        'hotel-kyc': {
-          title: 'KYC Hôtels',
-          component: HotelKYCPage
+        // Same single entry for salesperson
+        hotels: {
+          title: 'Hôtels',
+          component: HotelsPage
         },
       };
     }
@@ -162,11 +165,7 @@ const MainLayout = () => {
 
   const getCurrentPageConfig = () => {
     const pageConfig = pages[currentPage];
-
-    if (pageConfig) {
-      return pageConfig;
-    }
-
+    if (pageConfig) return pageConfig;
     return {
       title: 'Page non trouvée',
       component: () => (
@@ -191,14 +190,12 @@ const MainLayout = () => {
         isSidebarOpen={isSidebarOpen}
         setIsSidebarOpen={setIsSidebarOpen}
       />
-
       <div className="lg:ml-64">
         <Header
           title={currentPageConfig.title}
           isSidebarOpen={isSidebarOpen}
           setIsSidebarOpen={setIsSidebarOpen}
         />
-
         <main className="p-6">
           <React.Suspense
             fallback={

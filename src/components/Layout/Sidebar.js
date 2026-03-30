@@ -1,43 +1,19 @@
 import React, { useState } from 'react';
 import {
-  Home,
-  Users,
-  DollarSign,
-  BarChart3,
-  User,
-  Shield,
-  Settings,
-  LogOut,
-  X,
-  TrendingUp,
-  Info,
-  Lock,
-  CheckCircle,
-  XCircle,
-  Eye,
-  UserPlus,
-  Target,
-  FileText,
-  Calendar,
-  Network,
-  Building,
-  Megaphone,
-  TrendingUpDown,
-  Gift,
-  ClipboardCheck,
-  Star, // Add Star icon for super_admin
+  Home, Users, DollarSign, BarChart3, User, Shield, Settings,
+  LogOut, X, TrendingUp, Info, Lock, CheckCircle, XCircle,
+  Eye, UserPlus, Target, FileText, Calendar, Network, Building,
+  Megaphone, TrendingUpDown, Gift, ClipboardCheck, Star, Hotel,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { hasPermission } from '../../utils/permissions';
 import { PERMISSION_LABELS } from '../../utils/constants';
-import Communes from '../Sales/Communes';
 
 const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen }) => {
   const { user, logout, userType, isAdmin, isSalesPerson } = useAuth();
 
-  // Check if user has full access (CEO or Super Admin)
   const hasFullAccess = user?.role === 'ceo' || user?.role === 'super_admin';
-  
+
   const [showPermissionDetails, setShowPermissionDetails] = useState(false);
 
   const getMenuItems = () => {
@@ -85,6 +61,14 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
           icon: TrendingUp,
           permission: null,
           description: 'Performance du site'
+        },
+        // ── Single Hotels item — tabs inside handle KYC + Operators ──
+        {
+          id: 'hotels',
+          label: 'Hôtels',
+          icon: Hotel,
+          permission: null,
+          description: 'Opérateurs hôteliers & KYC'
         },
         {
           id: 'sales-people',
@@ -138,12 +122,13 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
           permission: null,
           description: 'Vue d\'ensemble de mes performances'
         },
+        // ── Single Hotels item for salesperson ───────────────────────
         {
-          id: 'hotel-kyc',
-          label: 'KYC Hôtels',
-          icon: ClipboardCheck,
+          id: 'hotels',
+          label: 'Hôtels',
+          icon: Hotel,
           permission: null,
-          description: 'Vérifier les dossiers KYC hôteliers'
+          description: 'Opérateurs hôteliers & KYC'
         },
         {
           id: 'property-requests',
@@ -210,7 +195,6 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
 
   const checkPermission = (item) => {
     if (!item.permission && !item.ceoOnly) return true;
-    // CEO and Super Admin can access CEO-only items
     if (item.ceoOnly) return hasFullAccess;
     if (isAdmin()) return hasPermission(user, item.permission);
     if (isSalesPerson()) return true;
@@ -218,25 +202,20 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
   };
 
   const visibleMenuItems = menuItems.filter(checkPermission);
-  const hiddenMenuItems = menuItems.filter(item => !checkPermission(item));
+  const hiddenMenuItems  = menuItems.filter(item => !checkPermission(item));
 
-  const handleLogout = () => {
-    logout();
-  };
+  const handleLogout = () => logout();
 
   const getPermissionStats = () => {
     if (isAdmin() && user?.permissions) {
       return {
-        total: Object.keys(user.permissions).length,
-        granted: hasFullAccess 
-          ? Object.keys(user.permissions).length 
+        total:   Object.keys(user.permissions).length,
+        granted: hasFullAccess
+          ? Object.keys(user.permissions).length
           : Object.values(user.permissions).filter(p => p === true).length
       };
     } else if (isSalesPerson()) {
-      return {
-        total: 3,
-        granted: 3
-      };
+      return { total: 3, granted: 3 };
     }
     return { total: 0, granted: 0 };
   };
@@ -245,12 +224,12 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
 
   const getRoleDisplay = () => {
     if (isAdmin()) {
-      if (user?.role === 'ceo') return 'PDG';
-      if (user?.role === 'super_admin') return 'Super Admin';
+      if (user?.role === 'ceo')              return 'PDG';
+      if (user?.role === 'super_admin')      return 'Super Admin';
       if (user?.role === 'regional_manager') return 'Directeur Régional';
-      if (user?.role === 'sales_manager') return 'Directeur des Ventes';
-      if (user?.role === 'team_leader') return 'Chef d\'Équipe';
-      if (user?.role === 'admin') return 'Administrateur';
+      if (user?.role === 'sales_manager')    return 'Directeur des Ventes';
+      if (user?.role === 'team_leader')      return 'Chef d\'Équipe';
+      if (user?.role === 'admin')            return 'Administrateur';
       return user?.role || 'Utilisateur';
     } else if (isSalesPerson()) {
       return 'Commercial';
@@ -261,32 +240,22 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
   const getHeaderInfo = () => {
     if (isAdmin()) {
       return {
-        title: hasFullAccess ? 'Super Admin Panel' : 'Admin Panel',
-        subtitle: hasFullAccess ? 'Gestion Complète' : 'Gestion des Ventes'
+        title:    hasFullAccess ? 'Super Admin Panel' : 'Admin Panel',
+        subtitle: hasFullAccess ? 'Gestion Complète'  : 'Gestion des Ventes'
       };
     } else if (isSalesPerson()) {
-      return {
-        title: 'Espace Commercial',
-        subtitle: 'Mon Interface'
-      };
+      return { title: 'Espace Commercial', subtitle: 'Mon Interface' };
     }
-    return {
-      title: 'Dashboard',
-      subtitle: 'Interface Utilisateur'
-    };
+    return { title: 'Dashboard', subtitle: 'Interface Utilisateur' };
   };
 
   const headerInfo = getHeaderInfo();
 
   const getHeaderBgColor = () => {
-    if (user?.role === 'ceo') return 'bg-yellow-600';
+    if (user?.role === 'ceo')        return 'bg-yellow-600';
     if (user?.role === 'super_admin') return 'bg-purple-600';
-    if (isSalesPerson()) return 'bg-green-600';
+    if (isSalesPerson())             return 'bg-green-600';
     return 'bg-blue-600';
-  };
-
-  const isNewFeature = (itemId) => {
-    return itemId === 'organization';
   };
 
   return (
@@ -303,30 +272,25 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0
       `}>
 
+        {/* App header */}
         <div className="p-6 border-b border-gray-700 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <div className={`${getHeaderBgColor()} rounded-lg p-2`}>
-                {hasFullAccess ? (
-                  <Star className="h-6 w-6" />
-                ) : (
-                  <TrendingUp className="h-6 w-6" />
-                )}
+                {hasFullAccess ? <Star className="h-6 w-6" /> : <TrendingUp className="h-6 w-6" />}
               </div>
               <div>
                 <h2 className="text-lg font-semibold">{headerInfo.title}</h2>
                 <p className="text-xs text-gray-400">{headerInfo.subtitle}</p>
               </div>
             </div>
-            <button
-              onClick={() => setIsSidebarOpen(false)}
-              className="lg:hidden text-gray-400 hover:text-white"
-            >
+            <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden text-gray-400 hover:text-white">
               <X className="h-5 w-5" />
             </button>
           </div>
         </div>
 
+        {/* User info */}
         <div className="p-4 border-b border-gray-700 flex-shrink-0">
           <div className="flex items-center space-x-3">
             <div className={`w-10 h-10 ${getHeaderBgColor()} rounded-full flex items-center justify-center`}>
@@ -335,27 +299,21 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
               </span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">
-                {user?.firstName} {user?.lastName}
-              </p>
-              <p className="text-xs text-gray-400 truncate">
-                {getRoleDisplay()}
-              </p>
+              <p className="text-sm font-medium truncate">{user?.firstName} {user?.lastName}</p>
+              <p className="text-xs text-gray-400 truncate">{getRoleDisplay()}</p>
               {hasFullAccess && (
                 <p className="text-xs text-purple-400 truncate flex items-center">
-                  <Star className="h-3 w-3 mr-1" />
-                  Accès complet
+                  <Star className="h-3 w-3 mr-1" /> Accès complet
                 </p>
               )}
               {isSalesPerson() && user?.salesId && (
-                <p className="text-xs text-green-400 truncate">
-                  ID: {user.salesId}
-                </p>
+                <p className="text-xs text-green-400 truncate">ID: {user.salesId}</p>
               )}
             </div>
           </div>
         </div>
 
+        {/* Permission bar */}
         <div className="p-4 border-b border-gray-700 flex-shrink-0">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs text-gray-400">
@@ -374,11 +332,9 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
           <div className="flex items-center space-x-2">
             <div className="flex-1 bg-gray-700 rounded-full h-2">
               <div
-                className={`h-2 rounded-full transition-all duration-300 ${
-                  hasFullAccess ? 'bg-purple-500' : 'bg-green-500'
-                }`}
+                className={`h-2 rounded-full transition-all duration-300 ${hasFullAccess ? 'bg-purple-500' : 'bg-green-500'}`}
                 style={{ width: `${permissionStats.total > 0 ? (permissionStats.granted / permissionStats.total) * 100 : 0}%` }}
-              ></div>
+              />
             </div>
             <span className={`text-xs font-medium ${hasFullAccess ? 'text-purple-400' : 'text-green-400'}`}>
               {permissionStats.granted} / {permissionStats.total}
@@ -386,12 +342,12 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
           </div>
           {hasFullAccess && (
             <p className="text-xs text-purple-400 mt-2 flex items-center justify-center">
-              <Star className="h-3 w-3 mr-1" />
-              Toutes les permissions sont activées
+              <Star className="h-3 w-3 mr-1" /> Toutes les permissions sont activées
             </p>
           )}
         </div>
 
+        {/* Permission detail breakdown */}
         {showPermissionDetails && isAdmin() && !hasFullAccess && (
           <div className="p-4 border-b border-gray-700 bg-gray-800 max-h-32 overflow-y-auto custom-scrollbar flex-shrink-0">
             <h4 className="text-xs font-medium text-gray-300 mb-2">Toutes les permissions:</h4>
@@ -401,29 +357,28 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
                   <span className="text-gray-400 truncate mr-2">
                     {PERMISSION_LABELS[permission] || permission}
                   </span>
-                  {granted ? (
-                    <CheckCircle className="h-3 w-3 text-green-500 flex-shrink-0" />
-                  ) : (
-                    <XCircle className="h-3 w-3 text-red-500 flex-shrink-0" />
-                  )}
+                  {granted
+                    ? <CheckCircle className="h-3 w-3 text-green-500 flex-shrink-0" />
+                    : <XCircle    className="h-3 w-3 text-red-500   flex-shrink-0" />
+                  }
                 </div>
               ))}
             </div>
           </div>
         )}
 
+        {/* Territory badge (salesperson) */}
         {isSalesPerson() && user?.territory && (
           <div className="p-4 border-b border-gray-700 flex-shrink-0">
             <div className="text-center">
               <p className="text-xs text-gray-400">Mon Territoire</p>
               <p className="text-sm font-medium text-green-400">{user.territory}</p>
-              {user.teamName && (
-                <p className="text-xs text-gray-400 mt-1">Équipe: {user.teamName}</p>
-              )}
+              {user.teamName && <p className="text-xs text-gray-400 mt-1">Équipe: {user.teamName}</p>}
             </div>
           </div>
         )}
 
+        {/* Navigation */}
         <nav className="flex-1 p-4 overflow-y-auto custom-scrollbar min-h-0">
           <div className="mb-6">
             <h3 className="text-xs font-medium text-gray-400 mb-3 uppercase tracking-wider">
@@ -431,23 +386,19 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
             </h3>
             <ul className="space-y-2">
               {visibleMenuItems.map((item) => {
-                const Icon = item.icon;
+                const Icon     = item.icon;
                 const isActive = currentPage === item.id;
-
                 return (
                   <li key={item.id}>
                     <button
-                      onClick={() => {
-                        setCurrentPage(item.id);
-                        setIsSidebarOpen(false);
-                      }}
+                      onClick={() => { setCurrentPage(item.id); setIsSidebarOpen(false); }}
                       className={`
-                        w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors text-left group relative
+                        w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors text-left group
                         ${isActive
-                          ? hasFullAccess 
+                          ? hasFullAccess
                             ? 'bg-purple-600 text-white'
-                            : isSalesPerson() 
-                              ? 'bg-green-600 text-white' 
+                            : isSalesPerson()
+                              ? 'bg-green-600 text-white'
                               : 'bg-blue-600 text-white'
                           : 'text-gray-300 hover:bg-gray-800 hover:text-white'
                         }
@@ -455,9 +406,7 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
                       title={item.description}
                     >
                       <Icon className="h-5 w-5 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <span className="truncate block">{item.label}</span>
-                      </div>
+                      <span className="truncate">{item.label}</span>
                     </button>
                   </li>
                 );
@@ -465,15 +414,13 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
             </ul>
           </div>
 
+          {/* Locked items (admin only) */}
           {isAdmin() && hiddenMenuItems.length > 0 && (
             <div className="mb-6">
-              <h3 className="text-xs font-medium text-gray-400 mb-3 uppercase tracking-wider">
-                Accès Restreint
-              </h3>
+              <h3 className="text-xs font-medium text-gray-400 mb-3 uppercase tracking-wider">Accès Restreint</h3>
               <ul className="space-y-2">
                 {hiddenMenuItems.map((item) => {
                   const Icon = item.icon;
-
                   return (
                     <li key={item.id}>
                       <div
@@ -483,9 +430,7 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
                         <Icon className="h-5 w-5 flex-shrink-0" />
                         <div className="flex-1 min-w-0">
                           <span className="truncate block">{item.label}</span>
-                          <span className="text-xs text-gray-500 truncate block">
-                            Permission requise
-                          </span>
+                          <span className="text-xs text-gray-500 truncate block">Permission requise</span>
                         </div>
                         <Lock className="h-4 w-4 text-gray-500 flex-shrink-0" />
                       </div>
@@ -497,6 +442,7 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
           )}
         </nav>
 
+        {/* Logout */}
         <div className="p-4 border-t border-gray-700 flex-shrink-0">
           <button
             onClick={handleLogout}
