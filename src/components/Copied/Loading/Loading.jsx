@@ -6,7 +6,7 @@ const Loading = () => {
       <CutoutTextLoader
         height="450px"
         background="rgba(14, 23, 42, 0.9)"
-        imgUrl="https://res.cloudinary.com/dsyohqesy/image/upload/v1748413363/icon_ezxwz1.png"
+        imgUrl="https://congondaku.s3.us-east-1.amazonaws.com/real-estate-listings/1775646035330-633521149.jpg"
       />
     </div>
   );

@@ -4,6 +4,7 @@ import {
   LogOut, X, TrendingUp, Info, Lock, CheckCircle, XCircle,
   Eye, UserPlus, Target, FileText, Calendar, Network, Building,
   Megaphone, TrendingUpDown, Gift, ClipboardCheck, Star, Hotel,
+  HeartHandshake
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { hasPermission } from '../../utils/permissions';
@@ -71,6 +72,13 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
           description: 'Opérateurs hôteliers & KYC'
         },
         {
+          id: 'partners',
+          label: 'Partenaires',
+          icon: HeartHandshake,
+          permission: null,
+          description: 'Demandes partenaires business'
+        },
+        {
           id: 'sales-people',
           label: 'Commerciaux',
           icon: Users,
@@ -129,6 +137,13 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
           icon: Hotel,
           permission: null,
           description: 'Opérateurs hôteliers & KYC'
+        },
+        {
+          id: 'partners',
+          label: 'Partenaires',
+          icon: HeartHandshake,
+          permission: null,
+          description: 'Demandes partenaires business'
         },
         {
           id: 'property-requests',
@@ -202,14 +217,14 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
   };
 
   const visibleMenuItems = menuItems.filter(checkPermission);
-  const hiddenMenuItems  = menuItems.filter(item => !checkPermission(item));
+  const hiddenMenuItems = menuItems.filter(item => !checkPermission(item));
 
   const handleLogout = () => logout();
 
   const getPermissionStats = () => {
     if (isAdmin() && user?.permissions) {
       return {
-        total:   Object.keys(user.permissions).length,
+        total: Object.keys(user.permissions).length,
         granted: hasFullAccess
           ? Object.keys(user.permissions).length
           : Object.values(user.permissions).filter(p => p === true).length
@@ -224,12 +239,12 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
 
   const getRoleDisplay = () => {
     if (isAdmin()) {
-      if (user?.role === 'ceo')              return 'PDG';
-      if (user?.role === 'super_admin')      return 'Super Admin';
+      if (user?.role === 'ceo') return 'PDG';
+      if (user?.role === 'super_admin') return 'Super Admin';
       if (user?.role === 'regional_manager') return 'Directeur Régional';
-      if (user?.role === 'sales_manager')    return 'Directeur des Ventes';
-      if (user?.role === 'team_leader')      return 'Chef d\'Équipe';
-      if (user?.role === 'admin')            return 'Administrateur';
+      if (user?.role === 'sales_manager') return 'Directeur des Ventes';
+      if (user?.role === 'team_leader') return 'Chef d\'Équipe';
+      if (user?.role === 'admin') return 'Administrateur';
       return user?.role || 'Utilisateur';
     } else if (isSalesPerson()) {
       return 'Commercial';
@@ -240,8 +255,8 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
   const getHeaderInfo = () => {
     if (isAdmin()) {
       return {
-        title:    hasFullAccess ? 'Super Admin Panel' : 'Admin Panel',
-        subtitle: hasFullAccess ? 'Gestion Complète'  : 'Gestion des Ventes'
+        title: hasFullAccess ? 'Super Admin Panel' : 'Admin Panel',
+        subtitle: hasFullAccess ? 'Gestion Complète' : 'Gestion des Ventes'
       };
     } else if (isSalesPerson()) {
       return { title: 'Espace Commercial', subtitle: 'Mon Interface' };
@@ -252,9 +267,9 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
   const headerInfo = getHeaderInfo();
 
   const getHeaderBgColor = () => {
-    if (user?.role === 'ceo')        return 'bg-yellow-600';
+    if (user?.role === 'ceo') return 'bg-yellow-600';
     if (user?.role === 'super_admin') return 'bg-purple-600';
-    if (isSalesPerson())             return 'bg-green-600';
+    if (isSalesPerson()) return 'bg-green-600';
     return 'bg-blue-600';
   };
 
@@ -359,7 +374,7 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
                   </span>
                   {granted
                     ? <CheckCircle className="h-3 w-3 text-green-500 flex-shrink-0" />
-                    : <XCircle    className="h-3 w-3 text-red-500   flex-shrink-0" />
+                    : <XCircle className="h-3 w-3 text-red-500   flex-shrink-0" />
                   }
                 </div>
               ))}
@@ -386,7 +401,7 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
             </h3>
             <ul className="space-y-2">
               {visibleMenuItems.map((item) => {
-                const Icon     = item.icon;
+                const Icon = item.icon;
                 const isActive = currentPage === item.id;
                 return (
                   <li key={item.id}>

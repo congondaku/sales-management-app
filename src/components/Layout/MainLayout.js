@@ -28,6 +28,7 @@ import FreeListingsPage from '../FreeListings/FreeListingsPage';
 
 // Hotels — single parent with tabs inside (KYC Queue + Operators)
 import HotelsPage from '../HotelKYC/HotelsPage';
+import PartnersPage from '../Partners/PartnersPage';
 
 const MainLayout = () => {
   const [currentPage, setCurrentPage] = useState('dashboard');
@@ -54,6 +55,10 @@ const MainLayout = () => {
         communes: {
           title: 'Communes',
           component: Communes
+        },
+        partners: {
+          title: 'Partenaires',
+          component: PartnersPage,
         },
         freelistings: {
           title: 'Annonces Gratuites',
@@ -147,6 +152,10 @@ const MainLayout = () => {
         hotels: {
           title: 'Hôtels',
           component: HotelsPage
+        },
+        partners: {
+          title: 'Partenaires',
+          component: PartnersPage,
         },
       };
     }

@@ -63,7 +63,7 @@ const LoginForm = () => {
     <div 
       className="min-h-screen flex items-center justify-center p-4 relative"
       style={{
-        backgroundImage: 'url(https://res.cloudinary.com/dsyohqesy/image/upload/v1748413363/icon_ezxwz1.png)',
+        backgroundImage: 'url(https://congondaku.s3.us-east-1.amazonaws.com/real-estate-listings/1775646035330-633521149.jpg)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'
