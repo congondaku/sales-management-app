@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   ArrowLeft, Building2, User, Mail, Phone, MapPin,
   FileText, Image, CheckCircle, XCircle, AlertTriangle,
-  ExternalLink, Eye, RefreshCw, Clock, Layers,
+  ExternalLink, Eye, RefreshCw, Clock, Layers, ZoomIn,
 } from 'lucide-react';
 import apiClient from '../../services/api';
 
@@ -17,6 +17,7 @@ const LEVEL_LABELS = {
 };
 
 const DOC_LABELS = {
+  businessLogo: 'Logo du business',
   nationalId: "Carte d'identité nationale",
   selfie:     "Selfie avec pièce d'identité",
   patente:    'Patente / Licence commerciale',
@@ -31,36 +32,98 @@ const STATUS_STYLES = {
   suspended:    'bg-amber-50 border-amber-200 text-amber-700',
 };
 
+const STATUS_LABELS = {
+  pending:      'En attente',
+  under_review: 'En examen',
+  approved:     'Approuvé',
+  rejected:     'Rejeté',
+  suspended:    'Suspendu',
+};
+
+// ── Inline image viewer modal ─────────────────────────────────
+const ImageModal = ({ url, label, onClose }) => (
+  <div
+    className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+    onClick={onClose}
+  >
+    <div className="relative max-w-3xl w-full" onClick={e => e.stopPropagation()}>
+      <button
+        onClick={onClose}
+        className="absolute -top-10 right-0 text-white text-sm hover:underline"
+      >
+        ✕ Fermer
+      </button>
+      <p className="text-white text-xs text-center mb-2 font-semibold uppercase tracking-wide">{label}</p>
+      <img
+        src={url}
+        alt={label}
+        className="w-full max-h-[80vh] object-contain rounded-xl"
+      />
+    </div>
+  </div>
+);
+
+// ── Document card — shows thumbnail inline ────────────────────
 const DocCard = ({ label, url }) => {
+  const [lightbox, setLightbox] = useState(false);
+
   if (!url) return (
     <div className="border border-dashed border-gray-200 rounded-xl p-4 text-center bg-gray-50">
       <FileText className="h-8 w-8 text-gray-300 mx-auto mb-2" />
       <p className="text-sm text-gray-400">{label} — Non fourni</p>
     </div>
   );
+
+  const isPDF = url.toLowerCase().includes('.pdf') || url.toLowerCase().includes('application/pdf');
+
   return (
-    <div className="border border-gray-200 rounded-xl overflow-hidden bg-white">
-      <div className="bg-gray-50 px-4 py-2 border-b border-gray-100 flex items-center justify-between">
-        <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">{label}</span>
-        <a href={url} target="_blank" rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700">
-          <ExternalLink className="h-3 w-3" /> Ouvrir
-        </a>
-      </div>
-      <div className="p-4">
-        <a href={url} target="_blank" rel="noopener noreferrer" className="block">
-          <div className="h-40 bg-gray-100 rounded-lg flex items-center justify-center group hover:bg-gray-200 transition-colors">
-            <div className="text-center">
-              <Eye className="h-8 w-8 text-gray-400 mx-auto mb-1 group-hover:text-blue-500 transition-colors" />
-              <p className="text-xs text-gray-500 group-hover:text-blue-500">Voir le document</p>
+    <>
+      {lightbox && <ImageModal url={url} label={label} onClose={() => setLightbox(false)} />}
+      <div className="border border-gray-200 rounded-xl overflow-hidden bg-white">
+        <div className="bg-gray-50 px-3 py-2 border-b border-gray-100 flex items-center justify-between">
+          <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide truncate mr-2">{label}</span>
+          <a href={url} target="_blank" rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 flex-shrink-0">
+            <ExternalLink className="h-3 w-3" /> Ouvrir
+          </a>
+        </div>
+        <div
+          className="h-44 bg-gray-100 overflow-hidden cursor-pointer relative group"
+          onClick={() => !isPDF && setLightbox(true)}
+        >
+          {isPDF ? (
+            <div className="w-full h-full flex flex-col items-center justify-center gap-2">
+              <FileText className="h-10 w-10 text-gray-400" />
+              <p className="text-xs text-gray-500">Document PDF</p>
+              <a href={url} target="_blank" rel="noopener noreferrer"
+                className="text-xs text-blue-600 hover:underline">Ouvrir le PDF</a>
             </div>
-          </div>
-        </a>
+          ) : (
+            <>
+              <img
+                src={url}
+                alt={label}
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                onError={e => {
+                  e.target.style.display = 'none';
+                  e.target.parentElement.innerHTML = '<div class="w-full h-full flex items-center justify-center"><p class="text-xs text-gray-400">Aperçu non disponible</p></div>';
+                }}
+              />
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                <div className="bg-white/90 rounded-lg px-3 py-1.5 flex items-center gap-1.5">
+                  <ZoomIn className="h-3.5 w-3.5 text-gray-700" />
+                  <span className="text-xs font-semibold text-gray-700">Agrandir</span>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 
+// ── Main ─────────────────────────────────────────────────────
 const PartnerDetail = ({ partner: initialPartner, onBack, onReviewed }) => {
   const [partner, setPartner]       = useState(initialPartner);
   const [loading, setLoading]       = useState(false);
@@ -69,6 +132,7 @@ const PartnerDetail = ({ partner: initialPartner, onBack, onReviewed }) => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError]           = useState('');
   const [toast, setToast]           = useState(null);
+  const [lightboxPhoto, setLightboxPhoto] = useState(null);
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
@@ -119,9 +183,19 @@ const PartnerDetail = ({ partner: initialPartner, onBack, onReviewed }) => {
 
   const docs   = partner.documents || {};
   const photos = docs.businessPhotos || [];
+  const isApproved = partner.status === 'approved';
 
   return (
     <div className="space-y-6">
+      {/* Lightbox for business photos */}
+      {lightboxPhoto && (
+        <ImageModal
+          url={lightboxPhoto.url}
+          label={`Photo ${lightboxPhoto.index + 1} / ${photos.length}`}
+          onClose={() => setLightboxPhoto(null)}
+        />
+      )}
+
       {/* Toast */}
       {toast && (
         <div className={`fixed top-4 right-4 z-50 px-5 py-3 rounded-xl shadow-lg text-sm font-semibold ${
@@ -146,9 +220,23 @@ const PartnerDetail = ({ partner: initialPartner, onBack, onReviewed }) => {
           Actualiser
         </button>
         <span className={`px-3 py-1.5 rounded-full text-xs font-bold border ${STATUS_STYLES[partner.status] || 'bg-gray-100 border-gray-200 text-gray-600'}`}>
-          {partner.status}
+          {STATUS_LABELS[partner.status] || partner.status}
         </span>
       </div>
+
+      {/* Approved banner */}
+      {isApproved && (
+        <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex items-center gap-3">
+          <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-green-700">Partenaire approuvé</p>
+            <p className="text-xs text-green-600">
+              {partner.approvedAt ? `Approuvé le ${fmt(partner.approvedAt)}` : 'Compte actif'}
+              {partner.reviewedBy?.firstName ? ` par ${partner.reviewedBy.firstName} ${partner.reviewedBy.lastName || ''}` : ''}
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
@@ -228,70 +316,147 @@ const PartnerDetail = ({ partner: initialPartner, onBack, onReviewed }) => {
               </h2>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {photos.map((url, i) => (
-                  <a key={i} href={url} target="_blank" rel="noopener noreferrer"
-                    className="group aspect-video bg-gray-100 rounded-xl overflow-hidden border border-gray-200 hover:border-orange-300 transition-colors flex items-center justify-center">
-                    <div className="text-center">
-                      <Image className="h-6 w-6 text-gray-400 mx-auto mb-1 group-hover:text-orange-500 transition-colors" />
-                      <p className="text-xs text-gray-400 group-hover:text-orange-500">Photo {i + 1}</p>
+                  <div
+                    key={i}
+                    className="aspect-video bg-gray-100 rounded-xl overflow-hidden border border-gray-200 hover:border-orange-300 transition-colors cursor-pointer relative group"
+                    onClick={() => setLightboxPhoto({ url, index: i })}
+                  >
+                    <img
+                      src={url}
+                      alt={`Photo ${i + 1}`}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                      onError={e => { e.target.style.display = 'none'; }}
+                    />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                      <div className="bg-white/90 rounded-lg px-2 py-1 flex items-center gap-1">
+                        <ZoomIn className="h-3 w-3 text-gray-700" />
+                        <span className="text-xs font-semibold text-gray-700">Voir</span>
+                      </div>
                     </div>
-                  </a>
+                  </div>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Action panel */}
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-            <h2 className="text-sm font-semibold text-gray-900 mb-4">Décision</h2>
+          {/* Action panel — hidden when approved */}
+          {!isApproved && (
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+              <h2 className="text-sm font-semibold text-gray-900 mb-4">Décision</h2>
 
-            {error && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">{error}</div>
-            )}
+              {error && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">{error}</div>
+              )}
 
-            {!action ? (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {[
-                  { key: 'under_review', label: 'En examen',  color: 'border-blue-200 bg-blue-50 hover:bg-blue-100 hover:border-blue-400',     icon: Eye,           textColor: 'text-blue-700'   },
-                  { key: 'approved',     label: 'Approuver',  color: 'border-green-200 bg-green-50 hover:bg-green-100 hover:border-green-400', icon: CheckCircle,   textColor: 'text-green-700'  },
-                  { key: 'rejected',     label: 'Rejeter',    color: 'border-red-200 bg-red-50 hover:bg-red-100 hover:border-red-400',         icon: XCircle,       textColor: 'text-red-700'    },
-                  { key: 'suspended',    label: 'Suspendre',  color: 'border-amber-200 bg-amber-50 hover:bg-amber-100 hover:border-amber-400', icon: AlertTriangle, textColor: 'text-amber-700'  },
-                ].map(btn => {
-                  const Icon = btn.icon;
-                  return (
-                    <button key={btn.key} onClick={() => setAction(btn.key)}
-                      className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${btn.color}`}>
-                      <Icon className={`h-7 w-7 ${btn.textColor}`} />
-                      <span className={`text-sm font-semibold ${btn.textColor}`}>{btn.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className={`p-4 rounded-xl border-2 ${
-                  action === 'approved'     ? 'border-green-200 bg-green-50' :
-                  action === 'rejected'     ? 'border-red-200 bg-red-50' :
-                  action === 'under_review' ? 'border-blue-200 bg-blue-50' :
-                                              'border-amber-200 bg-amber-50'
-                }`}>
-                  <p className={`text-sm font-semibold ${
-                    action === 'approved'     ? 'text-green-700' :
-                    action === 'rejected'     ? 'text-red-700'   :
-                    action === 'under_review' ? 'text-blue-700'  : 'text-amber-700'
-                  }`}>
-                    {action === 'approved'     && `Approuver ${partner.businessName}`}
-                    {action === 'rejected'     && `Rejeter la demande de ${partner.businessName}`}
-                    {action === 'under_review' && "Marquer en cours d'examen"}
-                    {action === 'suspended'    && `Suspendre ${partner.businessName}`}
-                  </p>
-                  {action === 'approved' && (
-                    <p className="text-xs text-green-600 mt-1">
-                      Le partenaire sera notifié et pourra accéder à son espace.
-                    </p>
-                  )}
+              {!action ? (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {[
+                    { key: 'under_review', label: 'En examen',  color: 'border-blue-200 bg-blue-50 hover:bg-blue-100 hover:border-blue-400',     icon: Eye,           textColor: 'text-blue-700'   },
+                    { key: 'approved',     label: 'Approuver',  color: 'border-green-200 bg-green-50 hover:bg-green-100 hover:border-green-400', icon: CheckCircle,   textColor: 'text-green-700'  },
+                    { key: 'rejected',     label: 'Rejeter',    color: 'border-red-200 bg-red-50 hover:bg-red-100 hover:border-red-400',         icon: XCircle,       textColor: 'text-red-700'    },
+                    { key: 'suspended',    label: 'Suspendre',  color: 'border-amber-200 bg-amber-50 hover:bg-amber-100 hover:border-amber-400', icon: AlertTriangle, textColor: 'text-amber-700'  },
+                  ].map(btn => {
+                    const Icon = btn.icon;
+                    return (
+                      <button key={btn.key} onClick={() => setAction(btn.key)}
+                        className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${btn.color}`}>
+                        <Icon className={`h-7 w-7 ${btn.textColor}`} />
+                        <span className={`text-sm font-semibold ${btn.textColor}`}>{btn.label}</span>
+                      </button>
+                    );
+                  })}
                 </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className={`p-4 rounded-xl border-2 ${
+                    action === 'approved'     ? 'border-green-200 bg-green-50' :
+                    action === 'rejected'     ? 'border-red-200 bg-red-50' :
+                    action === 'under_review' ? 'border-blue-200 bg-blue-50' :
+                                                'border-amber-200 bg-amber-50'
+                  }`}>
+                    <p className={`text-sm font-semibold ${
+                      action === 'approved'     ? 'text-green-700' :
+                      action === 'rejected'     ? 'text-red-700'   :
+                      action === 'under_review' ? 'text-blue-700'  : 'text-amber-700'
+                    }`}>
+                      {action === 'approved'     && `Approuver ${partner.businessName}`}
+                      {action === 'rejected'     && `Rejeter la demande de ${partner.businessName}`}
+                      {action === 'under_review' && "Marquer en cours d'examen"}
+                      {action === 'suspended'    && `Suspendre ${partner.businessName}`}
+                    </p>
+                    {action === 'approved' && (
+                      <p className="text-xs text-green-600 mt-1">
+                        Le partenaire sera notifié et pourra accéder à son espace.
+                      </p>
+                    )}
+                  </div>
 
-                {(action === 'rejected' || action === 'suspended') && (
+                  {(action === 'rejected' || action === 'suspended') && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Motif <span className="text-red-500">*</span>
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={reason}
+                        onChange={e => setReason(e.target.value)}
+                        placeholder={action === 'rejected'
+                          ? 'Ex: Documents illisibles, informations incomplètes...'
+                          : 'Motif de suspension...'}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none"
+                      />
+                    </div>
+                  )}
+
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => { setAction(null); setReason(''); setError(''); }}
+                      disabled={submitting}
+                      className="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      onClick={handleSubmit}
+                      disabled={submitting}
+                      className={`flex-1 px-4 py-2 text-sm font-semibold text-white rounded-lg disabled:opacity-50 flex items-center justify-center gap-2 ${
+                        action === 'approved'     ? 'bg-green-600 hover:bg-green-700' :
+                        action === 'rejected'     ? 'bg-red-600 hover:bg-red-700'     :
+                        action === 'under_review' ? 'bg-blue-600 hover:bg-blue-700'   :
+                                                     'bg-amber-600 hover:bg-amber-700'
+                      }`}
+                    >
+                      {submitting && <RefreshCw className="h-4 w-4 animate-spin" />}
+                      {submitting ? 'En cours...' : (
+                        action === 'approved'     ? "Confirmer l'approbation" :
+                        action === 'rejected'     ? 'Confirmer le rejet'      :
+                        action === 'under_review' ? 'Marquer en examen'       :
+                                                     'Confirmer la suspension'
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* For approved — allow suspend only */}
+          {isApproved && (
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+              <h2 className="text-sm font-semibold text-gray-900 mb-3">Actions</h2>
+              {!action ? (
+                <button
+                  onClick={() => setAction('suspended')}
+                  className="flex items-center gap-2 px-4 py-2.5 border-2 border-amber-200 bg-amber-50 hover:bg-amber-100 rounded-xl text-amber-700 text-sm font-semibold transition-all"
+                >
+                  <AlertTriangle className="h-4 w-4" />
+                  Suspendre ce partenaire
+                </button>
+              ) : (
+                <div className="space-y-4">
+                  <div className="p-4 rounded-xl border-2 border-amber-200 bg-amber-50">
+                    <p className="text-sm font-semibold text-amber-700">Suspendre {partner.businessName}</p>
+                  </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Motif <span className="text-red-500">*</span>
@@ -300,44 +465,33 @@ const PartnerDetail = ({ partner: initialPartner, onBack, onReviewed }) => {
                       rows={3}
                       value={reason}
                       onChange={e => setReason(e.target.value)}
-                      placeholder={action === 'rejected'
-                        ? 'Ex: Documents illisibles, informations incomplètes...'
-                        : 'Motif de suspension...'}
+                      placeholder="Motif de suspension..."
                       className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none"
                     />
                   </div>
-                )}
-
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => { setAction(null); setReason(''); setError(''); }}
-                    disabled={submitting}
-                    className="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50"
-                  >
-                    Annuler
-                  </button>
-                  <button
-                    onClick={handleSubmit}
-                    disabled={submitting}
-                    className={`flex-1 px-4 py-2 text-sm font-semibold text-white rounded-lg disabled:opacity-50 flex items-center justify-center gap-2 ${
-                      action === 'approved'     ? 'bg-green-600 hover:bg-green-700' :
-                      action === 'rejected'     ? 'bg-red-600 hover:bg-red-700'     :
-                      action === 'under_review' ? 'bg-blue-600 hover:bg-blue-700'   :
-                                                   'bg-amber-600 hover:bg-amber-700'
-                    }`}
-                  >
-                    {submitting && <RefreshCw className="h-4 w-4 animate-spin" />}
-                    {submitting ? 'En cours...' : (
-                      action === 'approved'     ? "Confirmer l'approbation" :
-                      action === 'rejected'     ? 'Confirmer le rejet'      :
-                      action === 'under_review' ? 'Marquer en examen'       :
-                                                   'Confirmer la suspension'
-                    )}
-                  </button>
+                  {error && <p className="text-red-600 text-sm">{error}</p>}
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => { setAction(null); setReason(''); setError(''); }}
+                      disabled={submitting}
+                      className="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      onClick={handleSubmit}
+                      disabled={submitting}
+                      className="flex-1 px-4 py-2 text-sm font-semibold text-white bg-amber-600 hover:bg-amber-700 rounded-lg disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {submitting && <RefreshCw className="h-4 w-4 animate-spin" />}
+                      {submitting ? 'En cours...' : 'Confirmer la suspension'}
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
+
         </div>
       </div>
     </div>
