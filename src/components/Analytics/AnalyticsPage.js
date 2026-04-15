@@ -64,12 +64,8 @@ const PERIODS = [
   { value: 'week',    label: 'Cette semaine'    },
 ];
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-// Get the admin token from localStorage (same one the app already uses)
 const getAdminToken = () => localStorage.getItem('admin_token');
 
-// Get the Socket.io base URL from the apiClient base
 const getSocketURL = () => {
   try {
     const base = apiClient.defaults.baseURL || '';
@@ -154,7 +150,6 @@ const WithdrawModal = ({ onClose, onSuccess, currentBalanceUSD }) => {
         </div>
 
         <div className="p-5 space-y-4">
-          {/* Balance banner */}
           {currentBalanceUSD !== undefined && (
             <div className="flex items-center justify-between bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl px-4 py-3">
               <div className="flex items-center gap-2">
@@ -272,23 +267,24 @@ const AnalyticsPage = () => {
   const [page, setPage]         = useState(1);
   const [error, setError]       = useState(null);
   const [showWithdraw, setShowWithdraw] = useState(false);
+  const [wsConnected, setWsConnected]   = useState(false);
+  const [lastUpdated, setLastUpdated]   = useState(null);
 
-  // WebSocket state
-  const [wsConnected, setWsConnected] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState(null);
-  const socketRef   = useRef(null);
-  const paramsRef   = useRef({ period, category, page });
+  const socketRef       = useRef(null);
+  // Track whether the initial socket load has happened so we don't
+  // double-fetch when both the socket connects AND the effect deps run
+  const socketLoadedRef = useRef(false);
+  const paramsRef       = useRef({ period, category, page });
 
-  // Keep params ref in sync for the socket request
   useEffect(() => { paramsRef.current = { period, category, page }; }, [period, category, page]);
 
-  // ── HTTP fallback ─────────────────────────────────────────
-  const loadDataHTTP = useCallback(async () => {
+  // ── HTTP fallback / manual refresh ────────────────────────
+  const loadDataHTTP = useCallback(async (p = period, c = category, pg = page) => {
     setLoading(true); setError(null);
     try {
-      const params = new URLSearchParams({ page, limit: 50 });
-      if (period !== 'all') params.append('period', period);
-      if (category) params.append('category', category);
+      const params = new URLSearchParams({ page: pg, limit: 50 });
+      if (p !== 'all') params.append('period', p);
+      if (c) params.append('category', c);
       const res = await apiClient.get(`/finance/overview?${params}`);
       if (res.data.success) { setData(res.data); setLastUpdated(new Date()); }
       else setError(res.data.message || 'Erreur');
@@ -297,33 +293,56 @@ const AnalyticsPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [period, category, page]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // ── WebSocket setup ───────────────────────────────────────
+  // ── Emit socket request ───────────────────────────────────
+  const socketRequest = useCallback((p, c, pg) => {
+    if (socketRef.current?.connected) {
+      setLoading(true);
+      socketRef.current.emit('finance:request', { period: p, category: c, page: pg, limit: 50 });
+      return true;
+    }
+    return false;
+  }, []);
+
+  // ── WebSocket setup — runs once on mount ──────────────────
   useEffect(() => {
     let socket = null;
     let didCleanup = false;
 
     const connect = async () => {
       try {
-        // Dynamically import socket.io-client so the app doesn't break if not installed
         const { io } = await import('socket.io-client');
         const token  = getAdminToken();
-        if (!token) return; // not logged in as admin
+        if (!token) {
+          // No admin token — just use HTTP
+          loadDataHTTP(paramsRef.current.period, paramsRef.current.category, paramsRef.current.page);
+          return;
+        }
 
         socket = io(`${getSocketURL()}/finance`, {
-          auth:             { token },
-          transports:       ['websocket'],
-          reconnectionDelay: 2000,
+          auth:                 { token },
+          transports:           ['websocket'],
+          reconnectionDelay:    2000,
           reconnectionAttempts: 10,
         });
 
         socket.on('connect', () => {
           if (didCleanup) return;
           setWsConnected(true);
-          setLoading(true);
-          // Request data for current params on connect
-          socket.emit('finance:request', paramsRef.current);
+          // Only do the initial load once — subsequent param changes
+          // are handled by the period/category/page effect below
+          if (!socketLoadedRef.current) {
+            socketLoadedRef.current = true;
+            setLoading(true);
+            socket.emit('finance:request', {
+              period:   paramsRef.current.period,
+              category: paramsRef.current.category,
+              page:     paramsRef.current.page,
+              limit:    50,
+            });
+          }
         });
 
         socket.on('finance:update', (payload) => {
@@ -348,14 +367,16 @@ const AnalyticsPage = () => {
         socket.on('connect_error', () => {
           if (didCleanup) return;
           setWsConnected(false);
-          // Fall back to HTTP if socket fails
-          loadDataHTTP();
+          // Socket failed entirely — fall back to HTTP (only if no data yet)
+          if (!data) {
+            loadDataHTTP(paramsRef.current.period, paramsRef.current.category, paramsRef.current.page);
+          }
         });
 
         socketRef.current = socket;
       } catch {
-        // socket.io-client not installed — use HTTP only
-        loadDataHTTP();
+        // socket.io-client not installed
+        loadDataHTTP(paramsRef.current.period, paramsRef.current.category, paramsRef.current.page);
       }
     };
 
@@ -369,26 +390,30 @@ const AnalyticsPage = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // When period/category/page changes: re-request via socket or HTTP
+  // ── When period / category / page changes ─────────────────
+  // Skip the very first render (socket handles initial load).
+  // Only fires for user-driven changes after mount.
+  const isFirstRender = useRef(true);
   useEffect(() => {
-    if (socketRef.current?.connected) {
-      setLoading(true);
-      socketRef.current.emit('finance:request', { period, category, page, limit: 50 });
-    } else {
-      loadDataHTTP();
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
     }
-  }, [period, category, page, loadDataHTTP]);
+    // Try socket first, fall back to HTTP
+    if (!socketRequest(period, category, page)) {
+      loadDataHTTP(period, category, page);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [period, category, page]);
+
+  // Reset page when filter changes
+  useEffect(() => { setPage(1); }, [period, category]);
 
   const refresh = () => {
-    if (socketRef.current?.connected) {
-      setLoading(true);
-      socketRef.current.emit('finance:request', { period, category, page, limit: 50 });
-    } else {
-      loadDataHTTP();
+    if (!socketRequest(period, category, page)) {
+      loadDataHTTP(period, category, page);
     }
   };
-
-  useEffect(() => { setPage(1); }, [period, category]);
 
   const tx          = data?.transactions;
   const periodLabel = PERIODS.find(p => p.value === period)?.label || '';
@@ -400,8 +425,7 @@ const AnalyticsPage = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <div className="flex items-center gap-3">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-black">Finance & Revenus</h2>
-            {/* Live indicator */}
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Finance & Revenus</h2>
             <div className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${
               wsConnected
                 ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300'
@@ -411,29 +435,23 @@ const AnalyticsPage = () => {
               {wsConnected ? 'En direct' : 'Hors ligne'}
             </div>
           </div>
-          <div className="flex items-center gap-3 mt-0.5">
+          <div className="flex items-center gap-3 mt-0.5 flex-wrap">
             <p className="text-sm text-gray-500 dark:text-gray-400">
               Historique complet des paiements · Congo Ndaku
             </p>
-            {/* Test exclusion badge */}
-            {data && (
-              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                data.bypassActive
-                  ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300'
-                  : data.excludingTestAccounts
-                    ? 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
-                    : ''
-              }`}>
-                {data.bypassActive
-                  ? '⚠️ Mode test — comptes exclus inclus'
-                  : data.excludingTestAccounts
-                    ? '🔒 Comptes test exclus'
-                    : ''}
+            {data?.bypassActive && (
+              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300">
+                ⚠️ Mode test — comptes exclus inclus
+              </span>
+            )}
+            {!data?.bypassActive && data?.excludingTestAccounts && (
+              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
+                🔒 Comptes test exclus
               </span>
             )}
             {lastUpdated && (
               <span className="text-xs text-gray-400">
-                Mis à jour {lastUpdated.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                {lastUpdated.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
               </span>
             )}
           </div>
@@ -470,7 +488,6 @@ const AnalyticsPage = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           {
-            // Card 1: All-time USD balance — never changes with period
             label: 'Solde accumulé (USD)',
             value: loading ? null : usd(data?.allTime?.totalUSD),
             sub:   loading ? '' : `${(data?.allTime?.count || 0).toLocaleString('fr')} transactions au total`,
@@ -479,7 +496,6 @@ const AnalyticsPage = () => {
             badge: 'Solde',
           },
           {
-            // Card 2: All-time CDF balance
             label: 'Solde accumulé (CDF)',
             value: loading ? null : cdf(data?.allTime?.totalCDF),
             sub:   'Depuis le lancement',
@@ -487,7 +503,6 @@ const AnalyticsPage = () => {
             color: 'blue',
           },
           {
-            // Card 3: Period USD — CHANGES with dropdown
             label: period === 'all' ? 'Toutes périodes (USD)' : `${periodLabel} (USD)`,
             value: loading ? null : usd(data?.periodTotals?.totalUSD),
             sub:   loading ? '' : cdf(data?.periodTotals?.totalCDF),
@@ -495,10 +510,9 @@ const AnalyticsPage = () => {
             color: 'purple',
           },
           {
-            // Card 4: Period transaction count — CHANGES with dropdown
             label: 'Transactions',
             value: loading ? null : (data?.periodTotals?.count || 0).toLocaleString('fr'),
-            sub:   period === 'all' ? 'Depuis le début' : `Sur la période`,
+            sub:   period === 'all' ? 'Depuis le début' : 'Sur la période',
             icon:  Activity,
             color: 'amber',
           },
@@ -651,25 +665,41 @@ const AnalyticsPage = () => {
               <tbody className="divide-y divide-gray-100 dark:divide-gray-700/50">
                 {tx.data.map(t => (
                   <tr key={t._id} className="hover:bg-gray-50/60 dark:hover:bg-gray-700/20 transition-colors">
+
+                    {/* Date */}
                     <td className="px-5 py-3.5 whitespace-nowrap">
                       <p className="text-sm text-gray-800 dark:text-gray-200">{new Date(t.createdAt).toLocaleDateString('fr-FR')}</p>
                       <p className="text-xs text-gray-400">{new Date(t.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</p>
                     </td>
-                    <td className="px-5 py-3.5" style={{ maxWidth: 180 }}>
+
+                    {/* Client — show hotel name as subtitle for reservations */}
+                    <td className="px-5 py-3.5" style={{ maxWidth: 200 }}>
                       <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{t.customerName}</p>
-                      {t.externalId && <p className="text-xs text-gray-400 font-mono truncate">{t.externalId}</p>}
+                      {t.purpose === 'booking_fee' && t.hotelName ? (
+                        <p className="text-xs text-blue-500 dark:text-blue-400 truncate font-medium">
+                          🏨 {t.hotelName}{t.hotelVille ? ` · ${t.hotelVille}` : ''}
+                        </p>
+                      ) : t.externalId ? (
+                        <p className="text-xs text-gray-400 font-mono truncate">{t.externalId}</p>
+                      ) : null}
                     </td>
+
+                    {/* Category */}
                     <td className="px-5 py-3.5 whitespace-nowrap">
                       <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${CAT_BG[t.purpose] || 'bg-gray-100 dark:bg-gray-700 border-gray-200 dark:border-gray-600'} ${CAT_TEXT[t.purpose] || 'text-gray-600 dark:text-gray-400'}`}>
                         {t.purposeLabel}
                       </span>
                     </td>
+
+                    {/* Method */}
                     <td className="px-5 py-3.5 whitespace-nowrap">
                       <div className="flex items-center gap-1.5">
                         <Smartphone className="h-3.5 w-3.5 text-gray-400" />
                         <span className="text-xs text-gray-500 dark:text-gray-400">{METHOD_LABEL[t.paymentMethod] || t.paymentMethod || '—'}</span>
                       </div>
                     </td>
+
+                    {/* Amount */}
                     <td className="px-5 py-3.5 whitespace-nowrap text-right">
                       <p className="text-sm font-bold text-gray-900 dark:text-white">{t.currency === 'USD' ? usd(t.amount) : cdf(t.amount)}</p>
                       <div className="flex items-center justify-end gap-0.5 mt-0.5">
