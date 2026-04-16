@@ -2,7 +2,6 @@ import axios from 'axios';
 
 // ✅ ENVIRONMENT-BASED API URL
 const API_BASE_URL = 'https://pwz852vu2e.us-east-1.awsapprunner.com/api';
-
 // const API_BASE_URL = 'http://localhost:5002/api';
 const API_TIMEOUT = 15000; // Increased timeout for slow connections
 
