@@ -49,7 +49,7 @@ const STATUS_CONFIG = {
 
 const TARGET_OPTIONS = [
   { value: 'all',      label: 'Tous les utilisateurs', icon: Users },
-  // { value: 'partners', label: 'Partenaires approuvés', icon: Star },
+  { value: 'partners', label: 'Partenaires approuvés', icon: Star },
 ];
 
 const fmt = (d) => d
