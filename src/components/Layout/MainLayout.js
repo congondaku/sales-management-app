@@ -13,6 +13,7 @@ import PermissionsPage from '../Permissions/PermissionsPage';
 import SettingsPage from '../Settings/SettingsPage';
 import AdsPage from '../Ads/AdsPage';
 import PropertyRequestsPage from '../PropertyRequests/PropertyRequestsPage';
+import InvoicesPage from '../Invoices/InvoicesPage';
 
 // Sales Person Components
 import SalesDashboard from '../Sales/SalesDashboard';
@@ -51,6 +52,10 @@ const MainLayout = () => {
         'property-requests': {
           title: 'Demandes clients',
           component: PropertyRequestsPage,
+        },
+        'invoices': {
+          title: 'Factures',
+          component: InvoicesPage,
         },
         communes: {
           title: 'Communes',
@@ -119,6 +124,10 @@ const MainLayout = () => {
         'property-requests': {
           title: 'Demandes clients',
           component: PropertyRequestsPage,
+        },
+        'invoices': {
+          title: 'Factures',
+          component: InvoicesPage,
         },
         'annoces': {
           title: 'Annonces',

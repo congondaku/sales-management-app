@@ -43,6 +43,13 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
           description: 'Voir toutes les demandes de propriétés',
         },
         {
+          id: 'invoices',
+          label: 'Factures',
+          icon: FileText,
+          permission: null,
+          description: 'Créer et gérer les factures clients'
+        },
+        {
           id: 'freelistings',
           label: 'Annonces Gratuites',
           icon: Gift,
@@ -151,6 +158,13 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
           icon: ClipboardCheck,
           permission: null,
           description: 'Voir toutes les demandes de propriétés',
+        },
+        {
+          id: 'invoices',
+          label: 'Factures',
+          icon: FileText,
+          permission: null,
+          description: 'Créer et gérer les factures clients'
         },
         {
           id: 'freelistings',
