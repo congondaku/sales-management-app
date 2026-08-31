@@ -4,7 +4,7 @@ import {
   LogOut, X, TrendingUp, Info, Lock, CheckCircle, XCircle,
   Eye, UserPlus, Target, FileText, Calendar, Network, Building,
   Megaphone, TrendingUpDown, Gift, ClipboardCheck, Star, Hotel,
-  HeartHandshake
+  HeartHandshake, Contact, Link2
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { hasPermission } from '../../utils/permissions';
@@ -55,6 +55,20 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
           icon: Gift,
           permission: null,
           description: 'Gérer les annonces gratuites'
+        },
+        {
+          id: 'agents',
+          label: 'Agents Immobiliers',
+          icon: Contact,
+          permission: null,
+          description: 'Carnet d\'adresses des agents et suivi KYC'
+        },
+        {
+          id: 'assignments',
+          label: 'Affectations',
+          icon: Link2,
+          permission: null,
+          description: 'Lier ou délier un client et un agent'
         },
         {
           id: 'communes',
@@ -172,6 +186,20 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
           icon: Gift,
           permission: null,
           description: 'Créer des annonces gratuites pour les clients'
+        },
+        {
+          id: 'agents',
+          label: 'Agents Immobiliers',
+          icon: Contact,
+          permission: null,
+          description: 'Trouver un agent pour un client'
+        },
+        {
+          id: 'assignments',
+          label: 'Affectations',
+          icon: Link2,
+          permission: null,
+          description: 'Lier ou délier un client et un agent'
         },
         {
           id: 'communes',

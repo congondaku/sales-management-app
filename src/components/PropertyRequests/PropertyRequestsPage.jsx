@@ -1,15 +1,17 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Search, X, Phone, MessageCircle, MapPin, Home,
-  Clock, ChevronDown, ChevronUp, RefreshCw, Trash2,
-  CheckCircle, AlertCircle, SlidersHorizontal, Users,
-  UserCheck, Unlock, Lock, Timer, TrendingUp, AlertTriangle,
-  User, Eye, EyeOff, Link2, LinkIcon, UserPlus, ArrowRight,
-  Bed, Star
+  Clock, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, RefreshCw, Trash2,
+  CheckCircle, AlertCircle, SlidersHorizontal, Users, UserCheck, Unlock, Lock,
+  Timer, TrendingUp, AlertTriangle, User, Eye, EyeOff, Link2, LinkIcon, UserPlus,
+  ArrowRight, Bed, Star, Heart, ClipboardCheck,
 } from 'lucide-react';
 import apiClient from '../../services/api';
 import { apiHelpers } from '../../services/api';
 import LocationSelector from './LocationSelector';
+import interestService from '../../services/interest.service';
+import realEstateAgentService from '../../services/realEstateAgent.service';
+import listingService from '../../services/listing.service';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -42,6 +44,19 @@ const CLAIM_STATUS_TABS = [
   { value: 'fulfilled',   label: 'Traitées' },
 ];
 
+const INTEREST_STATUS_OPTIONS = [
+  { value: 'new', label: 'Nouveau', cls: 'bg-blue-100 text-blue-700' },
+  { value: 'contacted', label: 'Contacté', cls: 'bg-amber-100 text-amber-700' },
+  { value: 'closed', label: 'Clôturé', cls: 'bg-green-100 text-green-700' },
+];
+
+const AMENITY_LABELS = {
+  parking: 'Parking', garden: 'Jardin', furnished: 'Meublé', wifi: 'Wi-Fi',
+  airConditioner: 'Climatisation', security: 'Sécurité', solarPower: 'Panneaux solaires',
+  waterTank: 'Réservoir d\'eau', generator: 'Générateur', swimming: 'Piscine',
+  accessForDisabled: 'Accès handicapé',
+};
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const getDaysLeft = (expiresAt) => {
@@ -62,6 +77,7 @@ const formatBudget = (budget) => {
 };
 
 const timeAgo = (date) => {
+  if (!date) return '—';
   const h = Math.floor((Date.now() - new Date(date)) / 3600000);
   if (h < 1)  return 'Il y a moins d\'1h';
   if (h < 24) return `Il y a ${h}h`;
@@ -72,6 +88,17 @@ const timeAgo = (date) => {
 const hoursRemaining = (date) => {
   if (!date) return 0;
   return Math.max(0, Math.ceil((new Date(date) - Date.now()) / 3600000));
+};
+
+// Listing prices are split across three fields depending on listingType,
+// matching how Listing.js stores them (only the relevant one is ever set).
+const formatListingPrice = (listing) => {
+  if (!listing) return null;
+  const currency = listing.currency || 'USD';
+  if (listing.priceSale)    return `${currency} ${listing.priceSale.toLocaleString()}`;
+  if (listing.priceMonthly) return `${currency} ${listing.priceMonthly.toLocaleString()} /mois`;
+  if (listing.priceDaily)   return `${currency} ${listing.priceDaily.toLocaleString()} /jour`;
+  return null;
 };
 
 // ─── User Avatar ──────────────────────────────────────────────────────────────
@@ -904,9 +931,359 @@ const AgentSubmitModal = ({ onClose, onSave }) => {
   );
 };
 
+// ─── Listing Detail Modal ─────────────────────────────────────────────────────
+// The actual point of this whole tab: an agent looking at an interest needs
+// to see what the client is interested in, not just a title and a price.
+// Pulls the full document via GET /listings/:id (listingController.getListing).
+
+const StatChip = ({ icon: Icon, label, value }) => (
+  <div className="bg-gray-50 rounded-lg p-2.5 border border-gray-100 text-center">
+    {Icon && <Icon className="h-3.5 w-3.5 text-blue-500 mx-auto mb-1" />}
+    <p className="text-sm font-bold text-gray-800">{value}</p>
+    <p className="text-xs text-gray-400">{label}</p>
+  </div>
+);
+
+const ListingDetailModal = ({ listingId, onClose }) => {
+  const [listing, setListing] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [imgIndex, setImgIndex] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError('');
+    listingService.getListing(listingId)
+      .then(res => { if (active) setListing(res.listing); })
+      .catch(e => { if (active) setError(e.response?.data?.message || 'Erreur lors du chargement de l\'annonce'); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [listingId]);
+
+  const images = listing?.images || [];
+  const price = formatListingPrice(listing);
+  const activeAmenities = listing?.details
+    ? Object.entries(AMENITY_LABELS).filter(([key]) => listing.details[key])
+    : [];
+  const waPhone = listing?.listerPhoneNumber?.replace(/[^0-9]/g, '');
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-70 z-[60] flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-5 border-b border-gray-100 sticky top-0 bg-white z-10">
+          <h2 className="text-lg font-bold text-gray-900">Détail de l'annonce</h2>
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
+            <X className="h-5 w-5 text-gray-400" />
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="flex justify-center py-16">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+          </div>
+        ) : error ? (
+          <div className="p-6">
+            <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>
+          </div>
+        ) : !listing ? (
+          <div className="p-6 text-center text-sm text-gray-500">Annonce introuvable ou supprimée.</div>
+        ) : (
+          <div className="p-6 space-y-5">
+            {/* Image gallery */}
+            {images.length > 0 ? (
+              <div className="relative rounded-xl overflow-hidden bg-gray-100">
+                <img src={images[imgIndex]} alt={listing.title} className="w-full h-72 object-cover" />
+                {images.length > 1 && (
+                  <>
+                    <button
+                      onClick={() => setImgIndex(i => (i - 1 + images.length) % images.length)}
+                      className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white p-2 rounded-full shadow"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => setImgIndex(i => (i + 1) % images.length)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white p-2 rounded-full shadow"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                    <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-full">
+                      {imgIndex + 1} / {images.length}
+                    </div>
+                  </>
+                )}
+              </div>
+            ) : (
+              <div className="h-40 bg-gray-100 rounded-xl flex items-center justify-center text-gray-400 text-sm">
+                Aucune image
+              </div>
+            )}
+
+            {/* Title + price + status */}
+            <div>
+              <div className="flex items-start justify-between gap-3">
+                <h3 className="text-xl font-bold text-gray-900">{listing.title}</h3>
+                {price && <span className="text-lg font-bold text-blue-600 whitespace-nowrap">{price}</span>}
+              </div>
+              <div className="flex items-center gap-2 flex-wrap mt-2">
+                <span className="text-xs font-semibold px-2 py-1 bg-gray-100 text-gray-600 rounded-full">{listing.status}</span>
+                <span className="text-xs font-semibold px-2 py-1 bg-blue-50 text-blue-600 rounded-full">{listing.typeOfListing}</span>
+                <span className="text-xs text-gray-400 flex items-center gap-1">
+                  <MapPin className="h-3 w-3" /> {[listing.commune, listing.ville, listing.province].filter(Boolean).join(', ')}
+                </span>
+              </div>
+            </div>
+
+            {/* Description */}
+            {listing.description && (
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Description</p>
+                <p className="text-sm text-gray-700 whitespace-pre-line">{listing.description}</p>
+              </div>
+            )}
+
+            {/* Details grid */}
+            {listing.details && (
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                {listing.details.bedroom > 0 && <StatChip icon={Bed} label="Chambres" value={listing.details.bedroom} />}
+                {listing.details.bathroom > 0 && <StatChip label="SDB" value={listing.details.bathroom} />}
+                {listing.details.area > 0 && <StatChip label="Surface" value={`${listing.details.area} m²`} />}
+                {listing.details.yearBuilt && <StatChip label="Année" value={listing.details.yearBuilt} />}
+              </div>
+            )}
+
+            {/* Amenities */}
+            {activeAmenities.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Commodités</p>
+                <div className="flex flex-wrap gap-2">
+                  {activeAmenities.map(([key, label]) => (
+                    <span key={key} className="text-xs px-2.5 py-1 bg-green-50 text-green-700 rounded-full font-medium">{label}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Lister card */}
+            <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Contact du lister</p>
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <div>
+                  <p className="text-sm font-bold text-gray-900">{listing.listerFirstName} {listing.listerLastName}</p>
+                  <p className="text-xs text-gray-500">{listing.listerPhoneNumber}</p>
+                  {listing.listerEmailAddress && <p className="text-xs text-gray-500">{listing.listerEmailAddress}</p>}
+                </div>
+                {listing.listerPhoneNumber && (
+                  <div className="flex gap-2">
+                    <a href={`tel:${listing.listerPhoneNumber}`}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700">
+                      <Phone className="h-3.5 w-3.5" /> Appeler
+                    </a>
+                    <a href={`https://wa.me/${waPhone}`} target="_blank" rel="noreferrer"
+                      className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white text-xs font-semibold rounded-lg hover:bg-green-700">
+                      <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
+                    </a>
+                  </div>
+                )}
+              </div>
+              {listing.createdBy && (
+                <p className="text-xs text-gray-400 mt-2">
+                  Compte app: {listing.createdBy.firstName} {listing.createdBy.lastName}
+                  {listing.createdBy.email ? ` (${listing.createdBy.email})` : ''}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ─── Interests tab ────────────────────────────────────────────────────────────
+// Folded into this page rather than a standalone page + popup, so an agent
+// goes from "who's interested" straight to "here's the listing" without
+// hopping between pages, and without a modal that only showed a title.
+
+const InterestAgentAssign = ({ currentAgent, onSelect }) => {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState([]);
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const search = useCallback(async (q) => {
+    try {
+      setLoading(true);
+      const res = await realEstateAgentService.listAgents({ search: q || undefined, isActive: 'true', limit: 8 });
+      setResults(res.data || []);
+      setOpen(true);
+    } catch {
+      setResults([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const t = setTimeout(() => search(query), 300);
+    return () => clearTimeout(t);
+  }, [query, search]);
+
+  if (currentAgent) {
+    return (
+      <div className="flex items-center justify-between px-2.5 py-1.5 bg-purple-50 border border-purple-200 rounded-lg">
+        <span className="text-xs font-semibold text-purple-800 truncate">{currentAgent.firstName} {currentAgent.lastName}</span>
+        <button onClick={() => onSelect(null)} className="text-gray-400 hover:text-gray-600 flex-shrink-0">
+          <X className="h-3 w-3" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      <input
+        className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
+        placeholder="Assigner un agent..."
+        value={query}
+        onChange={e => setQuery(e.target.value)}
+        onFocus={() => { if (results.length === 0) search(''); setOpen(true); }}
+      />
+      {loading && <div className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />}
+      {open && results.length > 0 && (
+        <div className="absolute z-50 w-full bg-white border border-gray-200 rounded-lg shadow-xl mt-1 max-h-36 overflow-y-auto">
+          {results.map(a => (
+            <button key={a._id} onClick={() => { onSelect(a); setQuery(''); setOpen(false); }}
+              className="w-full text-left px-3 py-2 hover:bg-gray-50 text-xs border-b border-gray-50 last:border-0">
+              <span className="font-semibold text-gray-900">{a.firstName} {a.lastName}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const InterestItemRow = ({ interest, onOpenListing, onChanged }) => {
+  const [savingStatus, setSavingStatus] = useState(false);
+  const [savingAgent, setSavingAgent] = useState(false);
+  const listing = interest.listing;
+  const price = formatListingPrice(listing);
+
+  const handleStatus = async (status) => {
+    try { setSavingStatus(true); await interestService.updateInterestStatus(interest._id, { status }); onChanged(); }
+    catch { /* silent — row keeps prior status, user can retry */ }
+    finally { setSavingStatus(false); }
+  };
+
+  const handleAgent = async (agent) => {
+    try { setSavingAgent(true); await interestService.updateInterestStatus(interest._id, { handledBy: agent?._id || null }); onChanged(); }
+    catch { /* silent */ }
+    finally { setSavingAgent(false); }
+  };
+
+  return (
+    <div className="flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-100">
+      {listing?.images?.[0] ? (
+        <img src={listing.images[0]} alt="" className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
+      ) : (
+        <div className="w-14 h-14 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+          <Home className="h-5 w-5 text-gray-400" />
+        </div>
+      )}
+      <div className="flex-1 min-w-0">
+        <button
+          onClick={() => listing?._id && onOpenListing(listing._id)}
+          className="text-sm font-semibold text-gray-900 hover:text-blue-600 truncate block text-left"
+        >
+          {listing?.title || 'Annonce supprimée'}
+        </button>
+        <div className="flex items-center gap-2 mt-0.5">
+          {price && <span className="text-xs text-blue-600 font-semibold">{price}</span>}
+          <span className="text-xs text-gray-400">{timeAgo(interest.createdAt)}</span>
+        </div>
+        <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+          {INTEREST_STATUS_OPTIONS.map(opt => (
+            <button key={opt.value} onClick={() => handleStatus(opt.value)} disabled={savingStatus}
+              className={`px-2 py-0.5 text-xs font-semibold rounded-full disabled:opacity-50 ${interest.status === opt.value ? opt.cls : 'bg-gray-100 text-gray-400'}`}>
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="w-40 flex-shrink-0">
+        <div className={savingAgent ? 'opacity-50 pointer-events-none' : ''}>
+          <InterestAgentAssign currentAgent={interest.handledBy} onSelect={handleAgent} />
+        </div>
+      </div>
+      {listing?._id && (
+        <button
+          onClick={() => onOpenListing(listing._id)}
+          className="flex-shrink-0 px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700"
+        >
+          Voir l'annonce
+        </button>
+      )}
+    </div>
+  );
+};
+
+const InterestedUserRow = ({ row, expanded, onToggle, interests, loadingInterests, onOpenListing, onChanged }) => (
+  <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+    <button onClick={onToggle} className="w-full flex items-center justify-between p-4 hover:bg-gray-50 text-left">
+      <div className="flex items-center gap-3">
+        {row.user.profileImage ? (
+          <img src={row.user.profileImage} alt="" className="w-9 h-9 rounded-full object-cover" />
+        ) : (
+          <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center">
+            <span className="text-xs font-bold text-blue-700">{row.user.firstName?.[0]}{row.user.lastName?.[0]}</span>
+          </div>
+        )}
+        <div>
+          <p className="text-sm font-semibold text-gray-900">{row.user.firstName} {row.user.lastName}</p>
+          {row.user.phoneNumber && (
+            <span className="text-xs text-gray-500 flex items-center gap-1"><Phone className="h-3 w-3" /> {row.user.phoneNumber}</span>
+          )}
+        </div>
+      </div>
+      <div className="flex items-center gap-3">
+        <span className="text-xs text-gray-400 flex items-center gap-1"><Clock className="h-3 w-3" /> {timeAgo(row.lastInterestAt)}</span>
+        <span className="inline-flex items-center px-2.5 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded-full">{row.interestCount}</span>
+        {expanded ? <ChevronUp className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}
+      </div>
+    </button>
+    {expanded && (
+      <div className="border-t border-gray-100 p-3 space-y-2 bg-gray-50">
+        {loadingInterests ? (
+          <div className="flex justify-center py-4">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600" />
+          </div>
+        ) : interests.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-3">Aucun intérêt trouvé.</p>
+        ) : (
+          interests.map(i => (
+            <InterestItemRow key={i._id} interest={i} onOpenListing={onOpenListing} onChanged={() => onChanged(row.userId)} />
+          ))
+        )}
+      </div>
+    )}
+  </div>
+);
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 const PropertyRequestsPage = () => {
+  const [viewMode, setViewMode] = useState('requests'); // 'requests' | 'interests'
+
+  // ── Property requests state (unchanged) ──────────────────────────────────
   const [requests,    setRequests]    = useState([]);
   const [loading,     setLoading]     = useState(true);
   const [page,        setPage]        = useState(1);
@@ -973,167 +1350,298 @@ const PropertyRequestsPage = () => {
   const myClaims  = requests.filter(r => r.claimedBy && String(r.claimedBy._id||r.claimedBy) === String(currentSPId)).length;
   const linked    = requests.filter(r => r.fulfilledByUser).length;
 
+  // ── Interests state (new) ─────────────────────────────────────────────────
+  const [interestedUsers, setInterestedUsers] = useState([]);
+  const [interestsLoading, setInterestsLoading] = useState(false);
+  const [interestsPagination, setInterestsPagination] = useState({ page: 1, limit: 20, total: 0, pages: 1 });
+  const [expandedUserId, setExpandedUserId] = useState(null);
+  const [userInterests, setUserInterests] = useState({});
+  const [userInterestsLoading, setUserInterestsLoading] = useState({});
+  const [selectedListingId, setSelectedListingId] = useState(null);
+
+  const fetchInterestedUsers = useCallback(async (p = 1) => {
+    setInterestsLoading(true);
+    try {
+      const res = await interestService.getInterestedUsers(p, interestsPagination.limit);
+      setInterestedUsers(res.data || []);
+      setInterestsPagination(prev => ({ ...prev, page: res.page || p, total: res.total || 0, pages: res.pages || 1 }));
+    } catch (e) {
+      console.error('Interests fetch error:', e);
+    } finally {
+      setInterestsLoading(false);
+    }
+  }, [interestsPagination.limit]);
+
+  useEffect(() => {
+    if (viewMode === 'interests' && interestedUsers.length === 0 && !interestsLoading) {
+      fetchInterestedUsers(1);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewMode]);
+
+  const toggleExpandUser = async (userId) => {
+    if (expandedUserId === userId) { setExpandedUserId(null); return; }
+    setExpandedUserId(userId);
+    if (!userInterests[userId]) {
+      setUserInterestsLoading(prev => ({ ...prev, [userId]: true }));
+      try {
+        const res = await interestService.getInterestsForUser(userId);
+        setUserInterests(prev => ({ ...prev, [userId]: res.data || [] }));
+      } catch (e) {
+        console.error('user interests fetch error', e);
+      } finally {
+        setUserInterestsLoading(prev => ({ ...prev, [userId]: false }));
+      }
+    }
+  };
+
+  const refreshUserInterests = async (userId) => {
+    try {
+      const res = await interestService.getInterestsForUser(userId);
+      setUserInterests(prev => ({ ...prev, [userId]: res.data || [] }));
+    } catch { /* keep prior cached list on failure */ }
+  };
+
+  const handleRefresh = () => {
+    if (viewMode === 'requests') fetchRequests(page, filters, activeTab);
+    else fetchInterestedUsers(interestsPagination.page);
+  };
+
   return (
     <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Demandes clients</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{loading ? 'Chargement...' : `${total} demande${total !== 1 ? 's' : ''} active${total !== 1 ? 's' : ''}`}</p>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {viewMode === 'requests'
+              ? (loading ? 'Chargement...' : `${total} demande${total !== 1 ? 's' : ''} active${total !== 1 ? 's' : ''}`)
+              : (interestsLoading ? 'Chargement...' : `${interestsPagination.total} utilisateur${interestsPagination.total !== 1 ? 's' : ''} intéressé${interestsPagination.total !== 1 ? 's' : ''}`)
+            }
+          </p>
         </div>
         <div className="flex items-center gap-2">
-          {isSalesPerson && (
+          {viewMode === 'requests' && isSalesPerson && (
             <button onClick={() => setShowAgentModal(true)}
               className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-purple-600 rounded-xl hover:bg-purple-700">
               <Users className="h-4 w-4" /> Nouvelle demande client
             </button>
           )}
-          <button onClick={() => fetchRequests(1, filters, activeTab)}
+          <button onClick={handleRefresh}
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50">
             <RefreshCw className="h-4 w-4" /> Actualiser
           </button>
         </div>
       </div>
 
-      {/* Stats */}
-      {!loading && requests.length > 0 && (
-        <div className="grid grid-cols-5 gap-3">
-          {[
-            { label: 'Total',         value: total,    icon: Users,         color: 'blue' },
-            { label: 'Urgentes ≤7j',  value: urgent,   icon: AlertTriangle, color: 'red' },
-            { label: 'En cours',      value: inProg,   icon: Clock,         color: 'amber' },
-            { label: 'Disponibles',   value: unclaim,  icon: Unlock,        color: 'green' },
-            { label: 'Fournisseurs liés', value: linked, icon: Link2,       color: 'teal' },
-          ].map(s => {
-            const Icon = s.icon;
-            const cls = {
-              blue:  ['border-blue-200',  'bg-blue-50',  'text-blue-600'],
-              red:   ['border-red-200',   'bg-red-50',   'text-red-600'],
-              amber: ['border-amber-200', 'bg-amber-50', 'text-amber-600'],
-              green: ['border-green-200', 'bg-green-50', 'text-green-600'],
-              teal:  ['border-teal-200',  'bg-teal-50',  'text-teal-600'],
-            }[s.color];
-            return (
-              <div key={s.label} className={`bg-white border rounded-xl p-3 flex items-center gap-3 ${cls[0]}`}>
-                <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${cls[1]} ${cls[2]}`}>
-                  <Icon className="h-4 w-4" />
+      {/* Mode switch */}
+      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
+        <button onClick={() => setViewMode('requests')}
+          className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${viewMode === 'requests' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+          <ClipboardCheck className="h-4 w-4" /> Demandes clients
+        </button>
+        <button onClick={() => setViewMode('interests')}
+          className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${viewMode === 'interests' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+          <Heart className="h-4 w-4" /> Intérêts
+        </button>
+      </div>
+
+      {viewMode === 'requests' && (
+        <>
+          {/* Stats */}
+          {!loading && requests.length > 0 && (
+            <div className="grid grid-cols-5 gap-3">
+              {[
+                { label: 'Total',         value: total,    icon: Users,         color: 'blue' },
+                { label: 'Urgentes ≤7j',  value: urgent,   icon: AlertTriangle, color: 'red' },
+                { label: 'En cours',      value: inProg,   icon: Clock,         color: 'amber' },
+                { label: 'Disponibles',   value: unclaim,  icon: Unlock,        color: 'green' },
+                { label: 'Fournisseurs liés', value: linked, icon: Link2,       color: 'teal' },
+              ].map(s => {
+                const Icon = s.icon;
+                const cls = {
+                  blue:  ['border-blue-200',  'bg-blue-50',  'text-blue-600'],
+                  red:   ['border-red-200',   'bg-red-50',   'text-red-600'],
+                  amber: ['border-amber-200', 'bg-amber-50', 'text-amber-600'],
+                  green: ['border-green-200', 'bg-green-50', 'text-green-600'],
+                  teal:  ['border-teal-200',  'bg-teal-50',  'text-teal-600'],
+                }[s.color];
+                return (
+                  <div key={s.label} className={`bg-white border rounded-xl p-3 flex items-center gap-3 ${cls[0]}`}>
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${cls[1]} ${cls[2]}`}>
+                      <Icon className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-xl font-bold text-gray-900">{s.value}</p>
+                      <p className="text-xs text-gray-500">{s.label}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Tabs */}
+          <div className="flex gap-1 border-b border-gray-200">
+            {CLAIM_STATUS_TABS.map(tab => (
+              <button key={tab.value} onClick={() => handleTabChange(tab.value)}
+                className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px ${activeTab === tab.value ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Toolbar */}
+          <div className="flex items-center gap-3">
+            <select className="border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={filters.sort} onChange={e => { const f = {...filters, sort:e.target.value}; setFilters(f); fetchRequests(1,f,activeTab); }}>
+              {SORT_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+            </select>
+            <button onClick={() => setShowFilters(!showFilters)}
+              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-xl border transition-colors ${activeFilterCount > 0 ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}>
+              <SlidersHorizontal className="h-4 w-4" /> Filtres
+              {activeFilterCount > 0 && <span className="w-5 h-5 bg-white text-blue-600 rounded-full text-xs font-bold flex items-center justify-center">{activeFilterCount}</span>}
+            </button>
+            {activeFilterCount > 0 && (
+              <button onClick={resetFilters} className="flex items-center gap-1.5 text-sm text-red-500 hover:text-red-600 font-medium">
+                <X className="h-3.5 w-3.5" /> Effacer
+              </button>
+            )}
+          </div>
+
+          {/* Filter panel */}
+          {showFilters && (
+            <div className="bg-white border border-gray-200 rounded-2xl p-5 space-y-4">
+              <h3 className="font-bold text-gray-900 text-sm">Filtrer les demandes</h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">Type de bien</label>
+                  <select className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" value={filters.typeOfProperty} onChange={e => setFilters(f => ({...f, typeOfProperty:e.target.value}))}>
+                    {PROPERTY_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  </select>
                 </div>
                 <div>
-                  <p className="text-xl font-bold text-gray-900">{s.value}</p>
-                  <p className="text-xs text-gray-500">{s.label}</p>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">Transaction</label>
+                  <select className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" value={filters.listingType} onChange={e => setFilters(f => ({...f, listingType:e.target.value}))}>
+                    {LISTING_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">Commune</label>
+                  <input className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" placeholder="Ex: Gombe..." value={filters.commune} onChange={e => setFilters(f => ({...f, commune:e.target.value}))} />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">Province</label>
+                  <input className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" placeholder="Ex: Kinshasa..." value={filters.province} onChange={e => setFilters(f => ({...f, province:e.target.value}))} />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">Budget min</label>
+                  <div className="flex gap-1">
+                    <select className="border border-gray-200 rounded-xl px-2 py-2.5 text-sm" value={filters.currency} onChange={e => setFilters(f => ({...f, currency:e.target.value}))}>
+                      <option>USD</option><option>CDF</option>
+                    </select>
+                    <input type="number" className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm" placeholder="0" value={filters.budgetMin} onChange={e => setFilters(f => ({...f, budgetMin:e.target.value}))} />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">Budget max</label>
+                  <input type="number" className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" placeholder="∞" value={filters.budgetMax} onChange={e => setFilters(f => ({...f, budgetMax:e.target.value}))} />
                 </div>
               </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Tabs */}
-      <div className="flex gap-1 border-b border-gray-200">
-        {CLAIM_STATUS_TABS.map(tab => (
-          <button key={tab.value} onClick={() => handleTabChange(tab.value)}
-            className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px ${activeTab === tab.value ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Toolbar */}
-      <div className="flex items-center gap-3">
-        <select className="border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-          value={filters.sort} onChange={e => { const f = {...filters, sort:e.target.value}; setFilters(f); fetchRequests(1,f,activeTab); }}>
-          {SORT_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-        </select>
-        <button onClick={() => setShowFilters(!showFilters)}
-          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-xl border transition-colors ${activeFilterCount > 0 ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}>
-          <SlidersHorizontal className="h-4 w-4" /> Filtres
-          {activeFilterCount > 0 && <span className="w-5 h-5 bg-white text-blue-600 rounded-full text-xs font-bold flex items-center justify-center">{activeFilterCount}</span>}
-        </button>
-        {activeFilterCount > 0 && (
-          <button onClick={resetFilters} className="flex items-center gap-1.5 text-sm text-red-500 hover:text-red-600 font-medium">
-            <X className="h-3.5 w-3.5" /> Effacer
-          </button>
-        )}
-      </div>
-
-      {/* Filter panel */}
-      {showFilters && (
-        <div className="bg-white border border-gray-200 rounded-2xl p-5 space-y-4">
-          <h3 className="font-bold text-gray-900 text-sm">Filtrer les demandes</h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Type de bien</label>
-              <select className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" value={filters.typeOfProperty} onChange={e => setFilters(f => ({...f, typeOfProperty:e.target.value}))}>
-                {PROPERTY_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Transaction</label>
-              <select className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" value={filters.listingType} onChange={e => setFilters(f => ({...f, listingType:e.target.value}))}>
-                {LISTING_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Commune</label>
-              <input className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" placeholder="Ex: Gombe..." value={filters.commune} onChange={e => setFilters(f => ({...f, commune:e.target.value}))} />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Province</label>
-              <input className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" placeholder="Ex: Kinshasa..." value={filters.province} onChange={e => setFilters(f => ({...f, province:e.target.value}))} />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Budget min</label>
-              <div className="flex gap-1">
-                <select className="border border-gray-200 rounded-xl px-2 py-2.5 text-sm" value={filters.currency} onChange={e => setFilters(f => ({...f, currency:e.target.value}))}>
-                  <option>USD</option><option>CDF</option>
-                </select>
-                <input type="number" className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm" placeholder="0" value={filters.budgetMin} onChange={e => setFilters(f => ({...f, budgetMin:e.target.value}))} />
+              <div className="flex items-center justify-end gap-3 pt-2 border-t border-gray-100">
+                <button onClick={resetFilters} className="px-4 py-2 text-sm text-gray-500 font-medium">Réinitialiser</button>
+                <button onClick={applyFilters} className="px-5 py-2 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700">Appliquer</button>
               </div>
             </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Budget max</label>
-              <input type="number" className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" placeholder="∞" value={filters.budgetMax} onChange={e => setFilters(f => ({...f, budgetMax:e.target.value}))} />
+          )}
+
+          {/* List */}
+          {loading ? (
+            <div className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>
+          ) : requests.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-48 bg-white rounded-2xl border border-gray-200">
+              <Home className="h-12 w-12 text-gray-300 mb-3" />
+              <p className="font-semibold text-gray-700">Aucune demande trouvée</p>
+              <p className="text-sm text-gray-400 mt-1">{activeFilterCount > 0 ? 'Modifiez vos filtres.' : 'Les demandes apparaîtront ici.'}</p>
             </div>
-          </div>
-          <div className="flex items-center justify-end gap-3 pt-2 border-t border-gray-100">
-            <button onClick={resetFilters} className="px-4 py-2 text-sm text-gray-500 font-medium">Réinitialiser</button>
-            <button onClick={applyFilters} className="px-5 py-2 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700">Appliquer</button>
-          </div>
-        </div>
+          ) : (
+            <div className="space-y-3">
+              {requests.map(req => (
+                <RequestRow key={req._id} req={req} onRefresh={() => fetchRequests(page, filters, activeTab)}
+                  currentSalesPersonId={currentSPId} isSalesPerson={isSalesPerson} />
+              ))}
+            </div>
+          )}
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2">
+              <button disabled={page <= 1} onClick={() => fetchRequests(page-1, filters, activeTab)}
+                className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-40">Précédent</button>
+              <span className="text-sm text-gray-500 px-3">Page {page} / {totalPages}</span>
+              <button disabled={page >= totalPages} onClick={() => fetchRequests(page+1, filters, activeTab)}
+                className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-40">Suivant</button>
+            </div>
+          )}
+        </>
       )}
 
-      {/* List */}
-      {loading ? (
-        <div className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>
-      ) : requests.length === 0 ? (
-        <div className="flex flex-col items-center justify-center h-48 bg-white rounded-2xl border border-gray-200">
-          <Home className="h-12 w-12 text-gray-300 mb-3" />
-          <p className="font-semibold text-gray-700">Aucune demande trouvée</p>
-          <p className="text-sm text-gray-400 mt-1">{activeFilterCount > 0 ? 'Modifiez vos filtres.' : 'Les demandes apparaîtront ici.'}</p>
-        </div>
-      ) : (
+      {viewMode === 'interests' && (
         <div className="space-y-3">
-          {requests.map(req => (
-            <RequestRow key={req._id} req={req} onRefresh={() => fetchRequests(page, filters, activeTab)}
-              currentSalesPersonId={currentSPId} isSalesPerson={isSalesPerson} />
-          ))}
-        </div>
-      )}
+          {!interestsLoading && interestedUsers.length > 0 && (
+            <div className="bg-white border border-blue-200 rounded-xl p-3 flex items-center gap-3 w-fit">
+              <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                <Heart className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="text-xl font-bold text-gray-900">{interestsPagination.total}</p>
+                <p className="text-xs text-gray-500">Utilisateur(s) intéressé(s)</p>
+              </div>
+            </div>
+          )}
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2">
-          <button disabled={page <= 1} onClick={() => fetchRequests(page-1, filters, activeTab)}
-            className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-40">Précédent</button>
-          <span className="text-sm text-gray-500 px-3">Page {page} / {totalPages}</span>
-          <button disabled={page >= totalPages} onClick={() => fetchRequests(page+1, filters, activeTab)}
-            className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-40">Suivant</button>
+          {interestsLoading ? (
+            <div className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>
+          ) : interestedUsers.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-48 bg-white rounded-2xl border border-gray-200">
+              <Heart className="h-12 w-12 text-gray-300 mb-3" />
+              <p className="font-semibold text-gray-700">Aucun intérêt pour le moment</p>
+              <p className="text-sm text-gray-400 mt-1">Les manifestations d'intérêt des clients apparaîtront ici.</p>
+            </div>
+          ) : (
+            interestedUsers.map(row => (
+              <InterestedUserRow
+                key={row.userId}
+                row={row}
+                expanded={expandedUserId === row.userId}
+                onToggle={() => toggleExpandUser(row.userId)}
+                interests={userInterests[row.userId] || []}
+                loadingInterests={!!userInterestsLoading[row.userId]}
+                onOpenListing={setSelectedListingId}
+                onChanged={refreshUserInterests}
+              />
+            ))
+          )}
+
+          {interestsPagination.pages > 1 && (
+            <div className="flex items-center justify-center gap-2">
+              <button disabled={interestsPagination.page <= 1} onClick={() => fetchInterestedUsers(interestsPagination.page - 1)}
+                className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-40">Précédent</button>
+              <span className="text-sm text-gray-500 px-3">Page {interestsPagination.page} / {interestsPagination.pages}</span>
+              <button disabled={interestsPagination.page >= interestsPagination.pages} onClick={() => fetchInterestedUsers(interestsPagination.page + 1)}
+                className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-40">Suivant</button>
+            </div>
+          )}
         </div>
       )}
 
       {showAgentModal && (
         <AgentSubmitModal onClose={() => setShowAgentModal(false)}
           onSave={() => { setShowAgentModal(false); fetchRequests(1, filters, activeTab); }} />
+      )}
+
+      {selectedListingId && (
+        <ListingDetailModal listingId={selectedListingId} onClose={() => setSelectedListingId(null)} />
       )}
     </div>
   );

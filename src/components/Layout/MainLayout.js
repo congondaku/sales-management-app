@@ -31,6 +31,10 @@ import FreeListingsPage from '../FreeListings/FreeListingsPage';
 import HotelsPage from '../HotelKYC/HotelsPage';
 import PartnersPage from '../Partners/PartnersPage';
 
+// Real Estate Agent roster — shared between admin and salesperson
+import AgentsPage from '../Agents/AgentsPage';
+import AssignmentsPage from '../Assignments/AssignmentsPage';
+
 const MainLayout = () => {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -64,6 +68,14 @@ const MainLayout = () => {
         partners: {
           title: 'Partenaires',
           component: PartnersPage,
+        },
+        agents: {
+          title: 'Agents Immobiliers',
+          component: AgentsPage,
+        },
+        assignments: {
+          title: 'Affectations',
+          component: AssignmentsPage,
         },
         freelistings: {
           title: 'Annonces Gratuites',
@@ -120,6 +132,14 @@ const MainLayout = () => {
         'freelistings': {
           title: 'Annonces Gratuites',
           component: FreeListingsPage
+        },
+        'agents': {
+          title: 'Agents Immobiliers',
+          component: AgentsPage,
+        },
+        'assignments': {
+          title: 'Affectations',
+          component: AssignmentsPage,
         },
         'property-requests': {
           title: 'Demandes clients',

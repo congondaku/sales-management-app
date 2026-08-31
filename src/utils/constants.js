@@ -1,4 +1,5 @@
-// config.js - Fixed version with hardcoded deployed URL
+import apiClient from '../services/api';
+
 export const APP_CONFIG = {
   NAME: 'Système de Gestion des Ventes',
   VERSION: '1.0.0',
@@ -8,7 +9,7 @@ export const APP_CONFIG = {
 
 // ✅ FIXED: Force the deployed URL instead of relying on environment variables
 export const API_CONFIG = {
-  BASE_URL: 'https://pwz852vu2e.us-east-1.awsapprunner.com/api', // Hardcoded deployed URL
+  BASE_URL: 'https://nd-ca63c97939154afda89f1e74f48e5d0d.ecs.us-east-1.on.aws/api', // Hardcoded deployed URL
   FALLBACK_URL: 'http://localhost:5002/api', // Keep as fallback for development
   TIMEOUT: 10000,
   RETRY_ATTEMPTS: 3,

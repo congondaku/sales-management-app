@@ -37,7 +37,7 @@ const Communes = () => {
 
       while (hasMorePages && page <= 20) {
         const response = await fetch(
-          `https://pwz852vu2e.us-east-1.awsapprunner.com/api/listings?page=${page}&limit=50`
+          `https://nd-ca63c97939154afda89f1e74f48e5d0d.ecs.us-east-1.on.aws/api/listings?page=${page}&limit=50`
         );
 
         if (response.ok) {
