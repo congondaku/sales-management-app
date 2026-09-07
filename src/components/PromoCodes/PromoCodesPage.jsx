@@ -76,10 +76,14 @@ const StatusBadge = ({ promo }) => {
 };
 
 // ─── Copyable credentials chip ─────────────────────────────────────────────────
+// Note: NO password shown here anymore — the partner logs in with
+// their OWN real account password (the one they already use
+// everywhere else in the app), which this admin UI never sees or
+// generates. Only code + which account it's tied to are shown.
 
 const PartnerCredentialsChip = ({ code, partnerEmail }) => {
   const [copied, setCopied] = useState(false);
-  const summary = `Code: ${code}\nEmail: ${partnerEmail}`;
+  const summary = `Code: ${code}\nCompte: ${partnerEmail}`;
 
   const handleCopy = async () => {
     try {
@@ -95,7 +99,7 @@ const PartnerCredentialsChip = ({ code, partnerEmail }) => {
     <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
       <div className="flex-1 text-xs text-blue-700">
         <p><span className="font-semibold">Code :</span> {code}</p>
-        <p><span className="font-semibold">Email :</span> {partnerEmail}</p>
+        <p><span className="font-semibold">Compte lié :</span> {partnerEmail}</p>
       </div>
       <button onClick={handleCopy} className="flex-shrink-0 p-1 hover:bg-blue-100 rounded transition-colors" title="Copier">
         {copied ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5 text-blue-500" />}
@@ -205,11 +209,7 @@ const PromoCodeRow = ({ promo, onRefresh }) => {
   );
 };
 
-// ─── User lookup suggestions (real DB search) ──────────────────────────────────
-// Searches the ACTUAL user database (10k+ users) via the same
-// userService.getUsers({ search }) endpoint UsersPage.jsx already uses
-// — not a client-side list. Debounced 400ms, same convention UsersPage
-// already established for its own search input.
+// ─── Live user search (real DB, 10k+ users) ────────────────────────────────────
 
 const useUserSearch = () => {
   const [query, setQuery] = useState('');
@@ -281,43 +281,61 @@ const UserSuggestions = ({ results, searching, onSelect }) => {
   );
 };
 
+// ─── Selected partner card — replaces free-text once a real user is picked ─────
+
+const SelectedPartnerCard = ({ user, onChange }) => (
+  <div className="flex items-center gap-3 border border-green-200 bg-green-50 rounded-lg px-3 py-2.5">
+    <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 overflow-hidden">
+      {user.profileImage ? (
+        <img src={user.profileImage} alt="" className="w-full h-full object-cover" />
+      ) : (
+        <span className="text-xs font-semibold text-green-700">
+          {user.firstName?.charAt(0)}{user.lastName?.charAt(0)}
+        </span>
+      )}
+    </div>
+    <div className="flex-1 min-w-0">
+      <p className="text-sm font-medium text-gray-900 truncate">{user.firstName} {user.lastName}</p>
+      <p className="text-xs text-gray-500 truncate">{user.email}</p>
+    </div>
+    <button type="button" onClick={onChange} className="text-xs font-semibold text-blue-600 hover:underline flex-shrink-0">
+      Changer
+    </button>
+  </div>
+);
+
 // ─── Create Promo Code Modal ───────────────────────────────────────────────────
 
 const EMPTY_FORM = {
   code: '', discountType: 'percent', discountValue: '',
-  partnerName: '', partnerEmail: '', partnerType: 'influencer',
+  partnerType: 'influencer',
   maxRedemptions: '', perCustomerLimit: '1', expiresAt: '',
   commissionEnabled: false, commissionType: 'percent', commissionValue: '',
 };
 
 const CreatePromoCodeModal = ({ onClose, onCreated }) => {
   const [form, setForm] = useState({ ...EMPTY_FORM });
+  const [selectedUser, setSelectedUser] = useState(null); // { _id, firstName, lastName, email, profileImage }
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
   const [created, setCreated] = useState(null);
 
-  // Two independent search hooks — the admin might remember the
-  // influencer's name OR their email, either should surface the same
-  // real database result.
-  const nameSearch = useUserSearch();
-  const emailSearch = useUserSearch();
-  const [activeField, setActiveField] = useState(null); // 'name' | 'email' | null
+  const userSearch = useUserSearch();
+  const [searchFocused, setSearchFocused] = useState(false);
 
   const set = (field, val) => setForm(f => ({ ...f, [field]: val }));
 
   const handleSelectUser = (u) => {
-    setForm(f => ({
-      ...f,
-      partnerName: `${u.firstName || ''} ${u.lastName || ''}`.trim(),
-      partnerEmail: u.email || '',
-    }));
-    nameSearch.clear();
-    emailSearch.clear();
-    setActiveField(null);
+    setSelectedUser(u);
+    userSearch.setQuery('');
+    userSearch.clear();
+    setSearchFocused(false);
+    setErrors((e) => ({ ...e, partnerUserId: undefined }));
   };
 
   const handleSave = async () => {
-    const { isValid, errors: validationErrors } = promoCodeService.validatePromoCodeData(form);
+    const payload = { ...form, partnerUserId: selectedUser?._id };
+    const { isValid, errors: validationErrors } = promoCodeService.validatePromoCodeData(payload);
     if (!isValid) { setErrors(validationErrors); return; }
     setErrors({});
     try {
@@ -327,8 +345,7 @@ const CreatePromoCodeModal = ({ onClose, onCreated }) => {
         discountType: form.discountType,
         discountValue: Number(form.discountValue),
         currency: form.discountType === 'fixed' ? 'USD' : undefined,
-        partnerName: form.partnerName.trim() || undefined,
-        partnerEmail: form.partnerEmail.trim().toLowerCase(),
+        partnerUserId: selectedUser._id,
         partnerType: form.partnerType || undefined,
         maxRedemptions: form.maxRedemptions ? Number(form.maxRedemptions) : undefined,
         perCustomerLimit: form.perCustomerLimit ? Number(form.perCustomerLimit) : undefined,
@@ -337,7 +354,7 @@ const CreatePromoCodeModal = ({ onClose, onCreated }) => {
         commissionType: form.commissionEnabled ? form.commissionType : undefined,
         commissionValue: form.commissionEnabled ? Number(form.commissionValue) : undefined,
       });
-      setCreated(result);
+      setCreated({ ...result, partnerEmail: selectedUser.email });
     } catch (e) {
       setErrors({ general: e.message });
     } finally {
@@ -362,10 +379,11 @@ const CreatePromoCodeModal = ({ onClose, onCreated }) => {
           </div>
           <div className="p-6 space-y-4">
             <p className="text-sm text-gray-600">
-              Transmettez ces identifiants à <span className="font-semibold text-gray-900">{form.partnerName || 'votre partenaire'}</span> pour
-              qu'il/elle puisse suivre l'utilisation de son code, ses économies générées{form.commissionEnabled ? ' et sa commission' : ''}.
+              <span className="font-semibold text-gray-900">{selectedUser?.firstName} {selectedUser?.lastName}</span> peut
+              suivre ce code en se connectant à son portail partenaire avec son compte Congo Ndaku habituel
+              (même email, même mot de passe).
             </p>
-            <PartnerCredentialsChip code={form.code.toUpperCase()} partnerEmail={form.partnerEmail} />
+            <PartnerCredentialsChip code={form.code.toUpperCase()} partnerEmail={selectedUser?.email} />
           </div>
           <div className="flex justify-end p-6 border-t border-gray-100">
             <button onClick={() => { onCreated(); onClose(); }}
@@ -384,7 +402,7 @@ const CreatePromoCodeModal = ({ onClose, onCreated }) => {
         <div className="flex items-center justify-between p-6 border-b border-gray-100">
           <div>
             <h2 className="text-lg font-bold text-gray-900">Nouveau code promo</h2>
-            <p className="text-sm text-gray-500 mt-0.5">Le partenaire suivra son code via un portail dédié</p>
+            <p className="text-sm text-gray-500 mt-0.5">Le partenaire se connecte avec son compte Congo Ndaku existant</p>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
             <X className="h-5 w-5 text-gray-400" />
@@ -428,51 +446,40 @@ const CreatePromoCodeModal = ({ onClose, onCreated }) => {
             </div>
           </div>
 
-          <p className="text-xs text-gray-400 -mb-1">
-            Recherchez un utilisateur existant par nom ou email (base de {'>'}10k utilisateurs), ou saisissez librement s'il ne s'agit pas d'un utilisateur inscrit.
-          </p>
-
-          <div className="grid grid-cols-2 gap-3">
-            {/* Nom du partenaire — recherche live dans la vraie base */}
-            <div className="relative">
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">Nom du partenaire</label>
-              <input
-                className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Jean Mukendi"
-                value={form.partnerName}
-                onChange={e => { set('partnerName', e.target.value); nameSearch.setQuery(e.target.value); setActiveField('name'); }}
-                onFocus={() => setActiveField('name')}
-                onBlur={() => setTimeout(() => setActiveField(f => f === 'name' ? null : f), 150)}
-              />
-              {activeField === 'name' && (
-                <UserSuggestions results={nameSearch.results} searching={nameSearch.searching} onSelect={handleSelectUser} />
-              )}
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">Type de partenaire</label>
-              <select className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm" value={form.partnerType} onChange={e => set('partnerType', e.target.value)}>
-                {PARTNER_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-              </select>
-            </div>
+          {/* Partner — MUST be a real, selected user. No free text. */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Partenaire *</label>
+            {selectedUser ? (
+              <SelectedPartnerCard user={selectedUser} onChange={() => setSelectedUser(null)} />
+            ) : (
+              <div className="relative">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <input
+                    className={`w-full border rounded-lg pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.partnerUserId ? 'border-red-300' : 'border-gray-200'}`}
+                    placeholder="Rechercher par nom ou email…"
+                    value={userSearch.query}
+                    onChange={e => userSearch.setQuery(e.target.value)}
+                    onFocus={() => setSearchFocused(true)}
+                    onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
+                  />
+                </div>
+                {searchFocused && (
+                  <UserSuggestions results={userSearch.results} searching={userSearch.searching} onSelect={handleSelectUser} />
+                )}
+              </div>
+            )}
+            <p className="text-xs text-gray-400 mt-1">
+              Le partenaire se connectera avec ce code + son compte Congo Ndaku existant (même email et mot de passe qu'ailleurs sur la plateforme)
+            </p>
+            {errors.partnerUserId && <p className="text-xs text-red-500 mt-1">{errors.partnerUserId}</p>}
           </div>
 
-          {/* Email du partenaire — même recherche live, utile quand
-              l'admin se souvient de l'email plutôt que du nom exact */}
-          <div className="relative">
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Email du partenaire *</label>
-            <input
-              className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.partnerEmail ? 'border-red-300' : 'border-gray-200'}`}
-              placeholder="partenaire@email.com"
-              value={form.partnerEmail}
-              onChange={e => { set('partnerEmail', e.target.value); emailSearch.setQuery(e.target.value); setActiveField('email'); }}
-              onFocus={() => setActiveField('email')}
-              onBlur={() => setTimeout(() => setActiveField(f => f === 'email' ? null : f), 150)}
-            />
-            {activeField === 'email' && (
-              <UserSuggestions results={emailSearch.results} searching={emailSearch.searching} onSelect={handleSelectUser} />
-            )}
-            <p className="text-xs text-gray-400 mt-1">Le partenaire utilisera ce code + cet email pour se connecter à son portail de suivi</p>
-            {errors.partnerEmail && <p className="text-xs text-red-500 mt-1">{errors.partnerEmail}</p>}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Type de partenaire</label>
+            <select className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm" value={form.partnerType} onChange={e => set('partnerType', e.target.value)}>
+              {PARTNER_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+            </select>
           </div>
 
           <div className="grid grid-cols-3 gap-3">
@@ -493,10 +500,6 @@ const CreatePromoCodeModal = ({ onClose, onCreated }) => {
             </div>
           </div>
 
-          {/* Commission — la vraie logique métier de ce partenariat.
-              Distincte de la réduction : la réduction affecte ce que le
-              CLIENT paie, la commission affecte ce que Congo Ndaku
-              reverse au PARTENAIRE sur la vente. */}
           <div className="border-t border-gray-100 pt-4">
             <label className="flex items-center gap-2 mb-3 cursor-pointer">
               <input type="checkbox" checked={form.commissionEnabled} onChange={e => set('commissionEnabled', e.target.checked)} className="rounded" />

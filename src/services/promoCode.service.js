@@ -28,9 +28,10 @@ export const promoCodeService = {
     }
   },
 
-  // Validation légère côté client. Currency n'est plus demandée à
-  // l'admin — TOUT est en USD pour l'instant, un convertisseur sur le
-  // côté paiement gérera les autres devises plus tard.
+  // UPDATED — partnerUserId replaces partnerEmail as the required
+  // field. A promo code must now reference a REAL selected user
+  // account, not a freely-typed email — that's the actual security
+  // fix (login checks that user's real password, not a made-up one).
   validatePromoCodeData(data) {
     const errors = {};
 
@@ -50,8 +51,8 @@ export const promoCodeService = {
       errors.discountValue = 'Un pourcentage ne peut pas dépasser 100';
     }
 
-    if (!data.partnerEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.partnerEmail)) {
-      errors.partnerEmail = 'Un email de partenaire valide est requis';
+    if (!data.partnerUserId) {
+      errors.partnerUserId = 'Sélectionnez un partenaire dans la liste des utilisateurs';
     }
 
     return { isValid: Object.keys(errors).length === 0, errors };
