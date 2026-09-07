@@ -26,6 +26,7 @@ import Communes from '../Sales/Communes.js';
 import { ListingsManagement } from '@congondaku/listings-management';
 import Home from '../Copied/lib/components/Home/Home.jsx';
 import FreeListingsPage from '../FreeListings/FreeListingsPage';
+import PromoCodesPage from '../PromoCodes/PromoCodesPage';
 
 // Hotels — single parent with tabs inside (KYC Queue + Operators)
 import HotelsPage from '../HotelKYC/HotelsPage';
@@ -68,6 +69,10 @@ const MainLayout = () => {
         partners: {
           title: 'Partenaires',
           component: PartnersPage,
+        },
+        'promo-codes': {
+          title: 'Codes Promo',
+          component: PromoCodesPage,
         },
         agents: {
           title: 'Agents Immobiliers',

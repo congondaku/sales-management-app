@@ -4,7 +4,7 @@ import {
   LogOut, X, TrendingUp, Info, Lock, CheckCircle, XCircle,
   Eye, UserPlus, Target, FileText, Calendar, Network, Building,
   Megaphone, TrendingUpDown, Gift, ClipboardCheck, Star, Hotel,
-  HeartHandshake, Contact, Link2
+  HeartHandshake, Contact, Link2, Tag
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { hasPermission } from '../../utils/permissions';
@@ -55,6 +55,13 @@ const Sidebar = ({ currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen 
           icon: Gift,
           permission: null,
           description: 'Gérer les annonces gratuites'
+        },
+        {
+          id: 'promo-codes',
+          label: 'Codes Promo',
+          icon: Tag,
+          permission: null,
+          description: 'Créer et gérer les codes promo partenaires'
         },
         {
           id: 'agents',
