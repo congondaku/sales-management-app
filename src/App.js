@@ -8,7 +8,7 @@ import { useAuth } from './hooks/useAuth';
 import LoadingSpinner, { PageSpinner } from './components/Commons/LoadingSpinner';
 import { ToastContainer, useToast } from './components/Commons/Toast';
 
-// ✅ NEW: Import organization components
+
 import OrganizationChart from './components/Organization/OrganizationChart';
 
 // Composant principal de l'application
@@ -20,7 +20,7 @@ const AppContent = () => {
     return <PageSpinner text="Chargement de l'application..." />;
   }
 
-  // ✅ NEW: Route based on user type with organization chart
+
   const renderDashboard = () => {
     if (isAdmin()) {
       // Admin gets full MainLayout with all features including organization chart
