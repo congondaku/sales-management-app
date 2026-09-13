@@ -1,9 +1,9 @@
 import axios from 'axios';
 
-// ✅ ENVIRONMENT-BASED API URL
+
 const API_BASE_URL = 'https://nd-ca63c97939154afda89f1e74f48e5d0d.ecs.us-east-1.on.aws/api';
 // const API_BASE_URL = 'http://localhost:5003/api';
-const API_TIMEOUT = 15000; // Increased timeout for slow connections
+const API_TIMEOUT = 15000;
 
 console.log('🔧 API Configuration:', {
   baseURL: API_BASE_URL,
@@ -11,7 +11,7 @@ console.log('🔧 API Configuration:', {
   environment: process.env.NODE_ENV
 });
 
-// Instance Axios configurée - NO DEFAULT CONTENT-TYPE!
+
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
   timeout: API_TIMEOUT,
@@ -33,7 +33,6 @@ apiClient.interceptors.request.use(
       dataType: isFormData ? 'FormData' : typeof config.data
     });
     
-    // ✅ CRITICAL: Smart Content-Type handling
     if (isFormData) {
       // For FormData, DON'T set Content-Type
       // Browser will automatically set: multipart/form-data; boundary=...
@@ -53,29 +52,25 @@ apiClient.interceptors.request.use(
     
     if (adminToken) {
       config.headers.Authorization = `Bearer ${adminToken}`;
-      console.log('🔑 Using admin token');
     } else if (salesToken) {
       config.headers.Authorization = `Bearer ${salesToken}`;
-      console.log('🔑 Using sales token');
     } else {
-      console.log('🔓 No token found - public request');
     }
     
     return config;
   },
   (error) => {
-    console.error('❌ Request interceptor error:', error);
+    console.error('Request interceptor error:', error);
     return Promise.reject(error);
   }
 );
 
-// ✅ Enhanced response interceptor with performance tracking
 apiClient.interceptors.response.use(
   (response) => {
     const endTime = Date.now();
     const duration = endTime - (response.config.metadata?.startTime || endTime);
     
-    console.log('✅ API Response:', {
+    console.log('API Response:', {
       status: response.status,
       url: response.config.url,
       duration: `${duration}ms`,
@@ -96,7 +91,7 @@ apiClient.interceptors.response.use(
     const endTime = Date.now();
     const duration = endTime - (error.config?.metadata?.startTime || endTime);
     
-    console.error('❌ API Error:', {
+    console.error('API Error:', {
       status: error.response?.status,
       url: error.config?.url,
       message: error.response?.data?.message || error.message,
@@ -108,22 +103,21 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401) {
       handleAuthError();
     } else if (error.response?.status === 403) {
-      console.warn('🚫 Forbidden - Insufficient permissions');
+      console.warn('Forbidden - Insufficient permissions');
     } else if (error.response?.status === 429) {
-      console.warn('⏳ Rate limited - Too many requests');
+      console.warn('Rate limited - Too many requests');
     } else if (error.response?.status >= 500) {
-      console.error('🔥 Server error - Backend issue');
+      console.error('Server error - Backend issue');
     } else if (error.code === 'ECONNABORTED') {
-      console.error('⏰ Request timeout');
+      console.error('Request timeout');
     } else if (error.code === 'ERR_NETWORK') {
-      console.error('🌐 Network error - Check internet connection');
+      console.error('Network error - Check internet connection');
     }
     
     return Promise.reject(error);
   }
 );
 
-// ✅ Handle authentication errors
 function handleAuthError() {
   console.log('🔓 Authentication error - cleaning up tokens');
   
@@ -138,7 +132,7 @@ function handleAuthError() {
     
     // Only redirect if we're not already on login page
     if (!window.location.pathname.includes('/login')) {
-      console.log('➡️ Redirecting to admin login');
+      console.log('Redirecting to admin login');
       window.location.href = '/login';
     }
   } else if (salesToken) {
@@ -148,13 +142,12 @@ function handleAuthError() {
     
     // Redirect to sales login
     if (!window.location.pathname.includes('/sales-login')) {
-      console.log('➡️ Redirecting to sales login');
+      console.log('Redirecting to sales login');
       window.location.href = '/sales-login';
     }
   }
 }
 
-// ✅ API Helper functions
 export const apiHelpers = {
   // Check if current user is admin
   isAdmin() {
@@ -182,15 +175,14 @@ export const apiHelpers = {
     localStorage.removeItem('sales_person');
   },
   
-  // ✅ Test API connectivity
   async testConnection() {
     try {
-      console.log('🧪 Testing API connection to:', API_BASE_URL);
+      console.log('Testing API connection to:', API_BASE_URL);
       const response = await apiClient.get('/health', { timeout: 5000 });
-      console.log('✅ API Connection successful:', response.status);
+      console.log('API Connection successful:', response.status);
       return { success: true, status: response.status };
     } catch (error) {
-      console.error('❌ API Connection failed:', error.message);
+      console.error('API Connection failed:', error.message);
       return { 
         success: false, 
         error: error.message,
@@ -200,7 +192,7 @@ export const apiHelpers = {
     }
   },
 
-  // ✅ Check API health with detailed info
+
   async checkHealth() {
     try {
       const response = await apiClient.get('/admin/analytics/test');
@@ -220,7 +212,6 @@ export const apiHelpers = {
     }
   },
 
-  // ✅ Get current user info from localStorage
   getCurrentUser() {
     if (this.isAdmin()) {
       const user = localStorage.getItem('admin_user');
@@ -232,7 +223,6 @@ export const apiHelpers = {
     return null;
   },
 
-  // ✅ Update user data in localStorage
   updateCurrentUser(userData) {
     if (this.isAdmin()) {
       const currentUser = localStorage.getItem('admin_user');
@@ -249,7 +239,6 @@ export const apiHelpers = {
     }
   },
 
-  // ✅ Check if user has specific permission
   hasPermission(permission) {
     const user = this.getCurrentUser();
     if (!user) return false;
@@ -260,13 +249,11 @@ export const apiHelpers = {
     return user.permissions?.[permission] === true;
   },
 
-  // ✅ Get user role
   getUserRole() {
     const user = this.getCurrentUser();
     return user?.role || null;
   },
 
-  // ✅ Format API errors for user display
   formatError(error) {
     if (error.response?.data?.message) {
       return error.response.data.message;
@@ -282,13 +269,12 @@ export const apiHelpers = {
     }
   },
 
-  // ✅ Retry failed requests
   async retryRequest(originalRequest, maxRetries = 3) {
     let retries = 0;
     
     while (retries < maxRetries) {
       try {
-        console.log(`🔄 Retrying request (${retries + 1}/${maxRetries}):`, originalRequest.url);
+        console.log(`Retrying request (${retries + 1}/${maxRetries}):`, originalRequest.url);
         const response = await apiClient(originalRequest);
         return response;
       } catch (error) {
@@ -304,7 +290,7 @@ export const apiHelpers = {
     }
   },
 
-  // ✅ Check if API is available
+
   async isApiAvailable() {
     try {
       await this.testConnection();
@@ -314,7 +300,7 @@ export const apiHelpers = {
     }
   },
 
-  // ✅ Get API status with details
+
   async getApiStatus() {
     try {
       const healthCheck = await this.checkHealth();
@@ -340,5 +326,5 @@ export const apiHelpers = {
   }
 };
 
-// ✅ Export default client
+
 export default apiClient;
