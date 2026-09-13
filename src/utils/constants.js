@@ -7,16 +7,16 @@ export const APP_CONFIG = {
   COMPANY: 'Votre Entreprise'
 };
 
-// ✅ FIXED: Force the deployed URL instead of relying on environment variables
+
 export const API_CONFIG = {
-  BASE_URL: 'https://nd-ca63c97939154afda89f1e74f48e5d0d.ecs.us-east-1.on.aws/api', // Hardcoded deployed URL
-  FALLBACK_URL: 'http://localhost:5002/api', // Keep as fallback for development
+  BASE_URL: 'https://nd-ca63c97939154afda89f1e74f48e5d0d.ecs.us-east-1.on.aws/api', 
+  FALLBACK_URL: 'http://localhost:5002/api', 
   TIMEOUT: 10000,
   RETRY_ATTEMPTS: 3,
   RETRY_DELAY: 1000
 };
 
-// ✅ Helper to determine which API URL to use
+
 export const getApiUrl = () => {
   // In production, always use the deployed URL
   if (process.env.NODE_ENV === 'production') {
@@ -28,8 +28,8 @@ export const getApiUrl = () => {
 };
 
 // Log the API URL being used (for debugging)
-console.log('🔧 Environment:', process.env.NODE_ENV);
-console.log('🔧 API URL being used:', getApiUrl());
+console.log('Environment:', process.env.NODE_ENV);
+console.log('API URL being used:', getApiUrl());
 
 // Configuration de l'authentification
 export const AUTH_CONFIG = {
@@ -43,7 +43,7 @@ export const AUTH_CONFIG = {
 // Rôles utilisateur
 export const USER_ROLES = {
   CEO: 'ceo',
-  SUPER_ADMIN: 'super_admin', // ✅ NEW: Super Admin role
+  SUPER_ADMIN: 'super_admin',
   REGIONAL_MANAGER: 'regional_manager',
   SALES_MANAGER: 'sales_manager',
   TEAM_LEADER: 'team_leader',
@@ -54,7 +54,7 @@ export const USER_ROLES = {
 // Libellés des rôles en français
 export const ROLE_LABELS = {
   [USER_ROLES.CEO]: 'PDG',
-  [USER_ROLES.SUPER_ADMIN]: 'Super Administrateur', // ✅ NEW: Super Admin label
+  [USER_ROLES.SUPER_ADMIN]: 'Super Administrateur', 
   [USER_ROLES.REGIONAL_MANAGER]: 'Directeur Régional',
   [USER_ROLES.SALES_MANAGER]: 'Directeur des Ventes',
   [USER_ROLES.TEAM_LEADER]: 'Chef d\'Équipe',
@@ -62,10 +62,10 @@ export const ROLE_LABELS = {
   [USER_ROLES.SALES_PERSON]: 'Commercial'
 };
 
-// ✅ NEW: Hierarchical levels for roles (lower number = higher level)
+
 export const ROLE_LEVELS = {
   [USER_ROLES.CEO]: 1,
-  [USER_ROLES.SUPER_ADMIN]: 1, // Same level as CEO
+  [USER_ROLES.SUPER_ADMIN]: 1,
   [USER_ROLES.REGIONAL_MANAGER]: 2,
   [USER_ROLES.SALES_MANAGER]: 3,
   [USER_ROLES.TEAM_LEADER]: 4,
@@ -73,12 +73,12 @@ export const ROLE_LEVELS = {
   [USER_ROLES.SALES_PERSON]: 6
 };
 
-// ✅ NEW: Check if role has full access (CEO or Super Admin)
+
 export const isFullAccessRole = (role) => {
   return role === USER_ROLES.CEO || role === USER_ROLES.SUPER_ADMIN;
 };
 
-// ✅ NEW: Get role color for UI
+
 export const getRoleColor = (role) => {
   const colors = {
     [USER_ROLES.CEO]: 'yellow',
@@ -92,7 +92,7 @@ export const getRoleColor = (role) => {
   return colors[role] || 'gray';
 };
 
-// ✅ NEW: Get role icon name for UI
+
 export const getRoleIcon = (role) => {
   const icons = {
     [USER_ROLES.CEO]: 'Crown',
@@ -153,7 +153,6 @@ export const PERMISSION_LABELS = {
   [PERMISSIONS.CAN_MANAGE_PERMISSIONS]: 'Gérer les permissions'
 };
 
-// ✅ NEW: Default permissions for different roles
 export const DEFAULT_PERMISSIONS = {
   [USER_ROLES.CEO]: {
     [PERMISSIONS.CAN_CREATE_SALES_PEOPLE]: true,
