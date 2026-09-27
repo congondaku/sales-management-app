@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 
-const API_BASE_URL = 'https://nd-ca63c97939154afda89f1e74f48e5d0d.ecs.us-east-1.on.aws/api';
+const API_BASE_URL = 'https://ndaku-backend-epvb.onrender.com/api';
 // const API_BASE_URL = 'http://localhost:5003/api';
 const API_TIMEOUT = 15000;
 
